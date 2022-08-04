@@ -96,8 +96,6 @@ get_agg_data <- function(years) {
                                                      "victim_injury"),
                                        time_unit = "date",
                                        victim_type = TRUE)
-    victim_agg_demographic_totals_year <- get_victim_dem_agg(victim, time_unit = "year")
-    victim_agg_demographic_totals_month <- get_victim_dem_agg(victim, time_unit = "date")
 
     rm(victim); gc()
     rm(offense_small); gc()
@@ -106,8 +104,7 @@ get_agg_data <- function(years) {
     temp_agg_year <- offense_agg_year %>%
       left_join(offender_agg_year,                  by = c("ori", "time_unit")) %>%
       left_join(arrestee_agg_year,                  by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_year,                    by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_demographic_totals_year, by = c("ori", "time_unit"))
+      left_join(victim_agg_year,                    by = c("ori", "time_unit"))
 
 
     saveRDS(temp_agg_year,
@@ -116,8 +113,7 @@ get_agg_data <- function(years) {
     temp_agg_month <- offense_agg_month %>%
       left_join(offender_agg_month,                  by = c("ori", "time_unit")) %>%
       left_join(arrestee_agg_month,                  by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_month,                    by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_demographic_totals_month, by = c("ori", "time_unit"))
+      left_join(victim_agg_month,                    by = c("ori", "time_unit"))
     saveRDS(temp_agg_month,
             paste0("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_", year_temp, ".rds"))
 
@@ -156,15 +152,8 @@ add_missing_columns <- function(data) {
                 "arrestee_american_indian_hacking_computer_invasion",
                 "arrestee_white_sports_tampering",
                 "offender_american_indian_sports_tampering",
-                "victim_adult_animal_cruelty",
-                "victim_age_unknown_animal_cruelty",
-                "victim_hispanic_animal_cruelty",
-                "victim_not_hispanic_animal_cruelty",
-                "victim_asian_animal_cruelty",
-                "victim_american_indian_animal_cruelty",
-                "victim_black_animal_cruelty",
-                "victim_white_animal_cruelty",
-                "victim_female_animal_cruelty")) {
+                "victim_unknown_sex_rape",
+                "victim_unknown_sex_statutory_rape")) {
     if (!all(grepl(col, names(data)))) {
       data[, col] <- 0
     }
@@ -172,62 +161,75 @@ add_missing_columns <- function(data) {
   return(data)
 }
 
-# final_agg_year  <- combine_agg_data(type = "year")
-# final_agg_year  <- add_missing_columns(final_agg_year)
-# final_agg_year  <-
-#   final_agg_year %>%
-#   filter(ORI %in% ucr$ORI) %>%
-#   left_join(ucr_population_only) %>%
-#   left_join(ucr_name_only) %>%
-#   select(ORI,
-#          year,
-#          agency,
-#          state,
-#          population,
-#          everything())
-# setwd("nibrs")
-# make_largest_agency_json(final_agg_year)
-# make_state_agency_choices(final_agg_year)
-# files <- list.files(pattern = "agency_choices")
-# files
-# file.copy(files, paste0(here::here("data/nibrs_monthly/")), overwrite = TRUE)
-# make_agency_csvs(final_agg_year)
-
-final_agg_month <- combine_agg_data(type = "month")
-final_agg_month <- add_missing_columns(final_agg_month)
-final_agg_month$state_abb <- substr(final_agg_month$ORI, 1, 2)
-state_abb <- unique(substr(unique(final_agg_month$ORI), 1, 2))
-state_abb <- sort(state_abb)
-state_abb
-setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
-for (state_abb_temp in state_abb) {
-  temp <- final_agg_month %>% filter(state_abb %in% state_abb_temp)
-  final_agg_month <- final_agg_month %>% filter(!state_abb %in% state_abb_temp)
-  gc()
-
-  temp$state_abb <- NULL
-  temp  <-
-    temp %>%
-    filter(ORI %in% ucr$ORI) %>%
-    mutate(date = year,
-           year = year(year)) %>%
-    left_join(ucr_population_only, by = c("ORI", "year")) %>%
-    left_join(ucr_name_only, by = "ORI") %>%
-    select(-year) %>%
-    rename(year = date) %>%
-    select(ORI,
-           year,
-           agency,
-           state,
-           population,
-           everything())
-  gc()
-  temp$year <- as.character(temp$year)
-  make_agency_csvs(temp, type = "month")
-}
+final_agg_year  <- combine_agg_data(type = "year")
+final_agg_year  <- add_missing_columns(final_agg_year)
+final_agg_year  <-
+  final_agg_year %>%
+  filter(ORI %in% ucr$ORI) %>%
+  left_join(ucr_population_only) %>%
+  left_join(ucr_name_only) %>%
+  select(ORI,
+         year,
+         agency,
+         state,
+         population,
+         everything())
+setwd("nibrs")
+make_largest_agency_json(final_agg_year)
+make_state_agency_choices(final_agg_year)
+files <- list.files(pattern = "agency_choices")
+files
+file.copy(files, "C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
+names(final_agg_year) <- gsub("age_unknown", "unknown_age", names(final_agg_year))
+final_agg_year <- final_agg_year[, -grep("demographics_total", names(final_agg_year))]
+grep("victim.*sex.*rape", names(final_agg_year), value = TRUE)
+make_agency_csvs(final_agg_year)
 
 
 
 
+# final_agg_month <- combine_agg_data(type = "month")
+# final_agg_month <- add_missing_columns(final_agg_month)
+names(final_agg_month) <- gsub("age_unknown", "unknown_age", names(final_agg_month))
+final_agg_month <- final_agg_month[, -grep("demographics_total", names(final_agg_month))]
+# final_agg_month$state_abb <- substr(final_agg_month$ORI, 1, 2)
+# state_abb <- unique(substr(unique(final_agg_month$ORI), 1, 2))
+# state_abb <- sort(state_abb)
+# state_abb
+# setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
+# for (state_abb_temp in state_abb) {
+#   temp <- final_agg_month %>% filter(state_abb %in% state_abb_temp)
+#   final_agg_month <- final_agg_month %>% filter(!state_abb %in% state_abb_temp)
+#   gc()
+#
+#   temp$state_abb <- NULL
+#   temp  <-
+#     temp %>%
+#     filter(ORI %in% ucr$ORI) %>%
+#     mutate(date = year,
+#            year = year(year)) %>%
+#     left_join(ucr_population_only, by = c("ORI", "year")) %>%
+#     left_join(ucr_name_only, by = "ORI") %>%
+#     select(-year) %>%
+#     rename(year = date) %>%
+#     select(ORI,
+#            year,
+#            agency,
+#            state,
+#            population,
+#            everything())
+#   gc()
+#   temp$year <- as.character(temp$year)
+#   make_agency_csvs(temp, type = "month")
+# }
+
+
+
+temp1 <- (grep("victim.*unknown_sex", names(final_agg_year), value = TRUE))
+temp1 <- gsub("victim_unknown_sex_", "", temp1)
+temp2 <- (grep("victim.*unknown_ethnicity", names(final_agg_year), value = TRUE))
+temp2 <-  gsub("victim_unknown_ethnicity_", "", temp2)
+length(grep("victim.*unknown_race", names(final_agg_year)))
+length(grep("victim.*age_unknown", names(final_agg_year)))
 
 

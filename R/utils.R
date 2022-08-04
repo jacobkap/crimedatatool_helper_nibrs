@@ -7,20 +7,8 @@ library(janitor)
 library(dplyr)
 library(splitstackshape)
 library(crimeutils)
-library(here
-        )
-get_victim_dem_agg <- function(data, time_unit) {
-  data <- data %>%
-    filter(type_of_victim %in% c("individual",
-                                 "law enforcement officer")) %>%
-    aggregate_data(time_unit = time_unit)
-  names(data) <- paste0("demographics_total_", names(data))
-  data <-
-    data %>%
-    rename(ori       = demographics_total_ori,
-           time_unit = demographics_total_time_unit)
-  return(data)
-}
+library(here)
+
 
 
 age_fix <- c("over 98 years old"            = "99",
@@ -152,7 +140,7 @@ prep_victim <- function(file) {
   data$age_of_victim[data$age_of_victim %in% "unknown"] <- NA
   data$age_of_victim <- as.numeric(data$age_of_victim)
 
-  data$age_category                                <- "victim_age_unknown"
+  data$age_category                                <- "victim_unknown_age"
   data$age_category[data$age_of_victim %in% 0:17]  <- "victim_juvenile"
   data$age_category[data$age_of_victim %in% 18:99] <- "victim_adult"
 
@@ -205,7 +193,7 @@ prep_offender <- function(file, offense_data) {
   data$age_of_offender <- str_replace_all(data$age_of_offender, age_fix)
   data$age_of_offender[data$age_of_offender %in% "unknown"] <- NA
   data$age_of_offender <- as.numeric(data$age_of_offender)
-  data$age_category <- "offender_age_unknown"
+  data$age_category <- "offender_unknown_age"
   data$age_category[data$age_of_offender %in% 0:17]  <- "offender_juvenile"
   data$age_category[data$age_of_offender %in% 18:99] <- "offender_adult"
 
@@ -243,7 +231,7 @@ prep_arrestee <- function(arrestee_file, arrestee_group_b_file) {
   data$age_of_arrestee <- str_replace_all(data$age_of_arrestee, age_fix)
   data$age_of_arrestee[data$age_of_arrestee %in% "unknown"] <- NA
   data$age_of_arrestee <- as.numeric(data$age_of_arrestee)
-  data$age_category <- "arrestee_age_unknown"
+  data$age_category <- "arrestee_unknown_age"
   data$age_category[data$age_of_arrestee %in% 0:17]  <- "arrestee_juvenile"
   data$age_category[data$age_of_arrestee %in% 18:99] <- "arrestee_adult"
 
