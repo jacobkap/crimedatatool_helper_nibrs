@@ -5,28 +5,28 @@ victim_files   <- list.files(pattern = "victim.*rds$")
 offender_files <- list.files(pattern = "offender.*rds$")
 arrestee_files <- list.files(pattern = "nibrs_arrestee.*rds$")
 arrestee_group_b_files <- list.files(pattern = "group_b.*rds$")
+
+setwd("D:/ucr_data_storage/clean_data/nibrs")
+batch_header_files <- list.files(pattern = "batch.*rds")
+batch_header <- data.frame()
+for (file in batch_header_files) {
+  temp <- readRDS(file) %>%
+    select(ORI = ori,
+           year,
+           state,
+           population)
+  message(file)
+  batch_header <- bind_rows(batch_header, temp)
+}
+
 ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2020.rds") %>%
   select(ORI = ori9,
-         agency = crosswalk_agency_name,
-         year,
-         state,
-         population) %>%
-  filter(year %in% 1991:2020,
-         !is.na(ORI),
-         !is.na(state)) %>%
-  mutate(state  =  capitalize_words(state),
-         agency = capitalize_words(agency))
-ucr_population_only <-
-  ucr %>%
-  select(ORI,
-         year,
-         population)
-ucr_name_only <-
-  ucr %>%
-  select(ORI,
-         agency,
-         state) %>%
+         agency = crosswalk_agency_name) %>%
   distinct(ORI, .keep_all = TRUE)
+
+batch_header <- batch_header %>%
+  left_join(ucr) %>%
+  filter(!is.na(agency))
 
 
 #get_agg_data(1991:2020)
@@ -162,14 +162,15 @@ add_missing_columns <- function(data) {
 }
 
 
+batch_header <-
+  batch_header %>%
+  filter(ORI %in% final_agg_year$ORI)
 
 final_agg_year  <- combine_agg_data(type = "year")
 final_agg_year  <- add_missing_columns(final_agg_year); gc()
 final_agg_year  <-
   final_agg_year %>%
-  filter(ORI %in% ucr$ORI) %>%
-  left_join(ucr_population_only) %>%
-  left_join(ucr_name_only) %>%
+  left_join(batch_header) %>%
   select(ORI,
          year,
          agency,
@@ -207,11 +208,9 @@ for (state_abb_temp in state_abb) {
   temp$state_abb <- NULL
   temp  <-
     temp %>%
-    filter(ORI %in% ucr$ORI) %>%
     mutate(date = year,
            year = year(year)) %>%
-    left_join(ucr_population_only, by = c("ORI", "year")) %>%
-    left_join(ucr_name_only, by = "ORI") %>%
+    left_join(batch_header, by = c("ORI", "year")) %>%
     select(-year) %>%
     rename(year = date) %>%
     select(ORI,
