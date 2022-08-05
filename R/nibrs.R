@@ -26,7 +26,10 @@ ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yea
 
 batch_header <- batch_header %>%
   left_join(ucr) %>%
+  filter(!is.na(agency)) %>%
+  mutate(agency = capitalize_words(agency)) %>%
   filter(!is.na(agency))
+batch_header$state <- gsub(" V2", "", batch_header$state)
 
 
 #get_agg_data(1991:2020)
@@ -162,21 +165,22 @@ add_missing_columns <- function(data) {
 }
 
 
-batch_header <-
-  batch_header %>%
-  filter(ORI %in% final_agg_year$ORI)
+
 
 final_agg_year  <- combine_agg_data(type = "year")
 final_agg_year  <- add_missing_columns(final_agg_year); gc()
 final_agg_year  <-
   final_agg_year %>%
+  filter(ORI %in% batch_header$ORI) %>%
   left_join(batch_header) %>%
   select(ORI,
          year,
          agency,
          state,
          population,
-         everything())
+         everything()) %>%
+  filter(!is.na(agency))
+gc()
 setwd("nibrs")
 make_largest_agency_json(final_agg_year)
 make_state_agency_choices(final_agg_year)
@@ -210,6 +214,7 @@ for (state_abb_temp in state_abb) {
     temp %>%
     mutate(date = year,
            year = year(year)) %>%
+    filter(ORI %in% batch_header$ORI) %>%
     left_join(batch_header, by = c("ORI", "year")) %>%
     select(-year) %>%
     rename(year = date) %>%
@@ -223,5 +228,5 @@ for (state_abb_temp in state_abb) {
   temp$year <- as.character(temp$year)
   make_agency_csvs(temp, type = "month")
 }
-
+rm(final_agg_month); gc()
 
