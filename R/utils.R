@@ -8,9 +8,7 @@ library(dplyr)
 library(splitstackshape)
 library(crimeutils)
 library(here)
-
-
-
+library(parallel)
 age_fix <- c("over 98 years old"            = "99",
              "under 24 hours \\(neonate\\)" = "0",
              "1-6 days old"                 = "0",
@@ -254,7 +252,7 @@ prep_arrestee <- function(arrestee_file, arrestee_group_b_file) {
 
 aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALSE) {
 
-  # Drop NIBRS offenses without names - EXTREMELY rare. These are likely very
+  # Drop NIBRS offenses without names - EXTREMELY rare. These are likely
   # new subtypes of crimes.
   if(any(grepl("30A|61A|90K", data$offense))) {
     data <- data[-grep("30A|61A|90K", data$offense, ignore.case = TRUE), ]
@@ -385,6 +383,7 @@ make_state_agency_choices <- function(data) {
   }
 }
 
+
 make_agency_csvs <- function(data,
                              type = "year") {
 
@@ -396,6 +395,7 @@ make_agency_csvs <- function(data,
                      type = type)
 
 }
+
 make_all_na <- function(col) {
   col <- NA
 }

@@ -15,8 +15,8 @@ for (file in batch_header_files) {
            year,
            state,
            population,
-           number_of_months_reported)
-  #  filter(number_of_months_reported %in% 12)
+           number_of_months_reported) %>%
+    filter(number_of_months_reported %in% 12)
   message(file)
   batch_header <- bind_rows(batch_header, temp)
 }
@@ -30,9 +30,11 @@ batch_header <- batch_header %>%
   left_join(ucr) %>%
   filter(!is.na(agency)) %>%
   mutate(agency = capitalize_words(agency)) %>%
-  filter(!is.na(agency))
+  filter(!is.na(agency),
+         !is.na(state),
+         !is.na(ORI))
 batch_header$state <- gsub(" V2", "", batch_header$state)
-
+sort(unique(batch_header$state))
 
 #get_agg_data(1991:2020)
 get_agg_data <- function(years) {
@@ -126,13 +128,14 @@ get_agg_data <- function(years) {
   }
 }
 
-combine_agg_data <- function(type) {
+combine_agg_data <- function(type, batch_data) {
   setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
   files <- list.files(pattern = paste0("temp_agg_", type))
 
   final <- data.frame()
   for (file in files) {
     temp <- readRDS(file)
+    temp <- temp %>% filter(toupper(ori) %in% batch_data$ORI)
     temp[is.na(temp)] <- 0
     final <- bind_rows(final, temp)
     rm(temp); gc()
@@ -169,9 +172,9 @@ add_missing_columns <- function(data) {
 
 
 
-final_agg_year  <- combine_agg_data(type = "year")
+final_agg_year  <- combine_agg_data(type = "year", batch_header)
 final_agg_year  <- add_missing_columns(final_agg_year); gc()
-final_agg_year2  <-
+final_agg_year  <-
   final_agg_year %>%
   filter(ORI %in% batch_header$ORI) %>%
   left_join(batch_header) %>%
@@ -183,7 +186,7 @@ final_agg_year2  <-
          everything()) %>%
   filter(!is.na(agency))
 gc()
-setwd("nibrs")
+setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs")
 make_largest_agency_json(final_agg_year)
 make_state_agency_choices(final_agg_year)
 files <- list.files(pattern = "agency_choices")
@@ -197,8 +200,7 @@ rm(final_agg_year); gc()
 
 
 
-final_agg_month <- combine_agg_data(type = "month") %>%
-  filter(ORI %in% batch_header$ORI)
+final_agg_month <- combine_agg_data(type = "month", batch_header)
 final_agg_month <- add_missing_columns(final_agg_month)
 names(final_agg_month) <- gsub("age_unknown", "unknown_age", names(final_agg_month))
 final_agg_month <- final_agg_month[, -grep("demographics_total", names(final_agg_month))]
@@ -219,6 +221,7 @@ for (state_abb_temp in state_abb) {
            year = year(year)) %>%
     filter(ORI %in% batch_header$ORI) %>%
     left_join(batch_header, by = c("ORI", "year")) %>%
+    filter(!is.na(agency)) %>%
     select(-year) %>%
     rename(year = date) %>%
     select(ORI,
