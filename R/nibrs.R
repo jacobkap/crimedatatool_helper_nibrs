@@ -14,7 +14,9 @@ for (file in batch_header_files) {
     select(ORI = ori,
            year,
            state,
-           population)
+           population,
+           number_of_months_reported)
+  #  filter(number_of_months_reported %in% 12)
   message(file)
   batch_header <- bind_rows(batch_header, temp)
 }
@@ -169,7 +171,7 @@ add_missing_columns <- function(data) {
 
 final_agg_year  <- combine_agg_data(type = "year")
 final_agg_year  <- add_missing_columns(final_agg_year); gc()
-final_agg_year  <-
+final_agg_year2  <-
   final_agg_year %>%
   filter(ORI %in% batch_header$ORI) %>%
   left_join(batch_header) %>%
@@ -195,7 +197,8 @@ rm(final_agg_year); gc()
 
 
 
-final_agg_month <- combine_agg_data(type = "month")
+final_agg_month <- combine_agg_data(type = "month") %>%
+  filter(ORI %in% batch_header$ORI)
 final_agg_month <- add_missing_columns(final_agg_month)
 names(final_agg_month) <- gsub("age_unknown", "unknown_age", names(final_agg_month))
 final_agg_month <- final_agg_month[, -grep("demographics_total", names(final_agg_month))]
