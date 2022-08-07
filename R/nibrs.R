@@ -1,5 +1,6 @@
-source("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R", echo=TRUE)
+source("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
 
+admin_files  <- list.files(pattern = "admin.*rds$")
 offense_files  <- list.files(pattern = "offense.*rds$")
 victim_files   <- list.files(pattern = "victim.*rds$")
 offender_files <- list.files(pattern = "offender.*rds$")
@@ -40,15 +41,26 @@ sort(unique(batch_header$state))
 get_agg_data <- function(years) {
   for (year_temp in years) {
     offense <- prep_offense(offense_files[grep(year_temp, offense_files)])
+    admin   <- prep_admin(admin_files[grep(year_temp, admin_files)])
+    offense <-
+      offense %>%
+      left_join(admin)
+
     offense_small <- offense %>%
       select(ori,
              unique_incident_id,
              offense)
     offense_agg_year <- aggregate_data(offense,
-                                       variables = "gun_involved",
+                                       variables = c("gun_involved",
+                                                     "cleared",
+                                                     "location",
+                                                     'subtype'),
                                        time_unit = "year")
     offense_agg_month <- aggregate_data(offense,
-                                        variables = "gun_involved",
+                                        variables = c("gun_involved",
+                                                      "cleared",
+                                                      "location",
+                                                      "subtype"),
                                         time_unit = "date")
     rm(offense); gc()
 
@@ -92,7 +104,8 @@ get_agg_data <- function(years) {
                                                     "race_of_victim",
                                                     "ethnicity_of_victim",
                                                     "age_category",
-                                                    "victim_injury"),
+                                                    "victim_injury",
+                                                    "relationship"),
                                       time_unit = "year",
                                       victim_type = TRUE)
     victim_agg_month <- aggregate_data(victim,
@@ -100,7 +113,8 @@ get_agg_data <- function(years) {
                                                      "race_of_victim",
                                                      "ethnicity_of_victim",
                                                      "age_category",
-                                                     "victim_injury"),
+                                                     "victim_injury",
+                                                     "relationship"),
                                        time_unit = "date",
                                        victim_type = TRUE)
 
@@ -146,6 +160,20 @@ combine_agg_data <- function(type, batch_data) {
   final$ori <- toupper(final$ori)
   final <- final %>% rename(year = time_unit,
                             ORI  = ori)
+
+
+  names(final) <- gsub("^victim_refused_to_cooperate", "offense_victim_refused_to_cooperate",
+                      names(final))
+  names(final) <- gsub("^prosecution_declined", "offense_prosecution_declined",
+                      names(final))
+  names(final) <- gsub("^death_of_suspect", "offense_death_of_suspect",
+                      names(final))
+  names(final) <- gsub("^extradition_denied", "offense_extradition_denied",
+                      names(final))
+  names(final) <- gsub("^juvenile_no_custody", "offense_juvenile_no_custody",
+                      names(final))
+  names(final) <- gsub("^cleared_by_arrest", "offense_cleared_by_arrest",
+                      names(final))
   return(final)
 }
 
@@ -161,11 +189,22 @@ add_missing_columns <- function(data) {
                 "arrestee_white_sports_tampering",
                 "offender_american_indian_sports_tampering",
                 "victim_unknown_sex_rape",
-                "victim_unknown_sex_statutory_rape")) {
+                "victim_unknown_sex_statutory_rape",
+                "offense_victim_refused_to_cooperate_sports_tampering",
+                "offense_death_of_suspect_sports_tampering",
+                "offense_death_of_suspect_purchasing_prostitution",
+                "offense_death_of_suspect_human_trafficking_involuntary_servitude",
+                "offense_extradition_denied_sports_tampering",
+                "offense_juvenile_no_custody_gambling_equipment_violations",
+                "offense_juvenile_no_custody_sports_tampering",
+                "offense_juvenile_no_custody_purchasing_prostitution",
+                "offense_juvenile_no_custody_human_trafficking_involuntary_servitude")) {
     if (!all(grepl(col, names(data)))) {
       data[, col] <- 0
     }
   }
+
+  data$victim_unknown_relationship_animal_cruelty <- NULL
   return(data)
 }
 
@@ -235,4 +274,3 @@ for (state_abb_temp in state_abb) {
   make_agency_csvs(temp, type = "month")
 }
 rm(final_agg_month); gc()
-

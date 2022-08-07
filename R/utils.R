@@ -14,6 +14,8 @@ age_fix <- c("over 98 years old"            = "99",
              "1-6 days old"                 = "0",
              "7-364 days old"               = "0")
 
+
+
 race_fix <- c("^asian/pacific islander$"                    = "asian",
               "^P$"                                         = "asian",
               "^M$"                                         = "unknown",
@@ -22,6 +24,115 @@ race_fix <- c("^asian/pacific islander$"                    = "asian",
 ethnicity_fix <- c("^not of hispanic origin$" = "not_hispanic",
                    "^hispanic origin$"         = "hispanic")
 
+theft_crimes <- c("all other larceny",
+                  "pocket-picking",
+                  "purse-snatching",
+                  "shoplifting",
+                  "theft from building",
+                  "theft from coin-operated machine or device",
+                  "theft from motor vehicle",
+                  "theft of motor vehicle parts/accessories")
+
+relationship_unknown <- "relationship unknown"
+
+relationship_stranger <- "victim was stranger"
+
+relationship_other <- c("victim was acquaintance",
+                        "victim was employee",
+                        "victim was employer",
+                        "victim was friend",
+                        "victim was neighbor",
+                        "victim was offender",
+                        "victim was otherwise known")
+
+relationship_intimdate_partner <- c("victim was boyfriend/girlfriend",
+                                    "victim was common-law spouse",
+                                    "victim was in a homosexual relationship with the offender",
+                                    "victim was ex-relationship (ex-boyfriend/ex-girlfriend)",
+                                    "victim was ex-spouse",
+                                    "victim was spouse")
+
+
+relationship_other_family <- c("victim was babysittee (the baby)",
+                               "victim was grandchild",
+                               "victim was grandparent",
+                               "victim was in-law",
+                               "victim was parent",
+                               "victim was sibling",
+                               "victim was step-child",
+                               "victim was step-parent",
+                               "victim was step-sibling",
+                               "victim was child",
+                               "victim was child of boyfriend/girlfriend",
+                               "victim was other family member")
+
+
+location_other_unknown <- c("abandoned/condemned structure",
+                            "air/bus/train terminal",
+                            "amusement park",
+                            "arena/stadium/fairgrounds/coliseum",
+                            "auto dealership new/used",
+                            "bank/savings and loan",
+                            "church/synagogue/temple",
+                            "commercial/office building",
+                            "community center",
+                            "construction site",
+                            "convenience store",
+                            "cyberspace",
+                            "department/discount store",
+                            "drug store/doctors office/hospital",
+                            "farm facility",
+                            "gambling facility/casino/race track",
+                            "government/public building",
+                            "grocery/supermarket",
+                            "hotel/motel/etc.",
+                            "industrial site",
+                            "jail/prison",
+                            "liquor store",
+                            "military installation",
+                            "other/unknown",
+                            "rental storage facility",
+                            "restaurant",
+                            "service/gas station",
+                            "shelter - mission/homeless",
+                            "shopping mall",
+                            "specialty store (tv, fur, etc.)",
+                            "tribal lands")
+
+location_bar_club <- "bar/nightclub"
+
+
+location_outside <- c("atm separate from bank",
+                      "camp/campground",
+                      "dock/wharf/freight/model terminal",
+                      "field/woods",
+                      "highway/road/alley",
+                      "lake/waterway",
+                      "park/playground",
+                      "parking lot/garage",
+                      "rest area")
+
+location_home <- "residence/home"
+
+location_school <- c("school - college/university",
+                     "school - elementary/secondary",
+                     "school/college",
+                     "daycare facility")
+
+
+
+subtype_buy_possess_consume <- c("buying/receiving",
+                                 "possessing/concealing",
+                                 "using/consuming")
+subtype_sell_create_assist <- c("cultivating/manufacturing/publishing",
+                                "distributing/selling",
+                                "transporting/transmitting/importing",
+                                "operating/promoting/assisting")
+
+group_theft_offenses <- function(data) {
+  data$offense[data$offense %in% theft_crimes] <- "theft"
+  return(data)
+}
 
 # Keep most common year
 keep_most_common_year <- function(data) {
@@ -33,6 +144,26 @@ keep_most_common_year <- function(data) {
   return(data)
 }
 
+
+prep_admin <- function(file) {
+  data <- readRDS(file) %>%
+    select(unique_incident_id,
+           total_arrestee_segments,
+           cleared_exceptionally) %>%
+    mutate_if(is.character, tolower)
+
+    data$cleared <- "not cleared"
+    data$cleared[data$cleared_exceptionally %in% c("victim refused to cooperate")] <- "victim refused to cooperate"
+    data$cleared[data$cleared_exceptionally %in% "prosecution declined (for other than lack of probable cause)"] <- "prosecution declined"
+    data$cleared[data$cleared_exceptionally %in% "death of offender"] <- "death of suspect"
+    data$cleared[data$cleared_exceptionally %in% "extradition denied"] <- "extradition denied"
+    data$cleared[data$cleared_exceptionally %in% "juvenile/no custody"] <- "juvenile/no custody"
+
+    data$cleared[data$total_arrestee_segments > 0] <- "cleared by arrest"
+data$total_arrestee_segments <- NULL
+data$cleared_exceptionally   <- NULL
+  return(data)
+}
 
 prep_offense <- function(file) {
   data <- readRDS(file) %>%
@@ -46,24 +177,70 @@ prep_offense <- function(file) {
            offense = ucr_offense_code,
            type_weapon_force_involved_1,
            type_weapon_force_involved_2,
-           type_weapon_force_involved_3) %>%
+           type_weapon_force_involved_3,
+           type_criminal_activity_1,
+           type_criminal_activity_2,
+           type_criminal_activity_3,
+           location_type) %>%
     mutate_if(is.character, tolower)
   data <- keep_most_common_year(data)
   data$gun_involved <- "no_gun"
   for (i in 1:3) {
     data$temp <- data[, paste0("type_weapon_force_involved_", i)]
     data$temp[is.na(data$temp)] <- "none"
-    data$gun_involved[data$temp %in% c("handgun",
-                                       "firearm (type not stated)",
+    data$gun_involved[data$temp %in% "handgun"] <- "handgun"
+    data$gun_involved[data$temp %in% c("firearm (type not stated)",
                                        "rifle",
                                        "shotgun",
-                                       "other firearm")] <- "gun"
+                                       "other firearm")] <- "other/unknown gun"
     data[, paste0("type_weapon_force_involved_", i)] <- NULL
   }
-  data$temp <- NULL
+  data$subtype <- NA
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% subtype_buy_possess_consume] <- "buy_possess_consume"
+  }
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% subtype_sell_create_assist] <- "sell_create_assist"
+  }
+  # Now top-code animal abuse
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% "simple/gross neglect (unintentionally, intentionally, or knowingly failing to provide food, water, shelter, veterinary care, hoarding, etc.)"] <- "neglect"
+  }
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% "intentional abuse and torture (tormenting, mutilating, poisoning, or abandonment)"] <- "abuse/torture"
+  }
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% "organized abuse (dog fighting and cock fighting)"] <- "animal fighting"
+  }
+  for (i in 1:3) {
+    data$temp <- data[, paste0("type_criminal_activity_", i)]
+    data$subtype[data$temp %in% "animal sexual abuse (bestiality)"] <- "bestiality"
+  }
 
-  data$offense <- paste("offense", data$offense)
+  data$temp <- NULL
+  data$type_criminal_activity_1 <- NULL
+  data$type_criminal_activity_2 <- NULL
+  data$type_criminal_activity_3 <- NULL
+
+
+  data$location <- NA
+  data$location[data$location_type %in% c(NA, location_other_unknown)] <- "other/unknown location"
+  data$location[data$location_type %in% location_bar_club]             <- "bar/nightclub"
+  data$location[data$location_type %in% location_home]                 <- "home"
+  data$location[data$location_type %in% location_school]               <- "school"
+  data$location[data$location_type %in% location_outside]              <- "outside"
+
+  data <- group_theft_offenses(data)
+  data$cleared      <- paste("offense", data$cleared)
+  data$offense      <- paste("offense", data$offense)
+  data$subtype      <- paste("offense", data$subtype)
   data$gun_involved <- paste("offense", data$gun_involved)
+  data$location     <- paste("offense", data$location)
   return(data)
 }
 
@@ -92,6 +269,7 @@ prep_victim <- function(file) {
            type_of_injury_3,
            type_of_injury_4,
            type_of_injury_5,
+           relation_of_vict_to_offender1,
            incident_date) %>%
     mutate(date = ymd(incident_date),
            date = floor_date(date, unit = "month"),
@@ -134,6 +312,14 @@ prep_victim <- function(file) {
   }
   data <- final
 
+
+  data$relationship <- NA
+  data$relationship[data$relation_of_vict_to_offender1 %in% c(NA, relationship_unknown )]    <- "unknown relationship"
+  data$relationship[data$relation_of_vict_to_offender1 %in% relationship_stranger ]          <- "stranger"
+  data$relationship[data$relation_of_vict_to_offender1 %in% relationship_other ]             <- "other relationship"
+  data$relationship[data$relation_of_vict_to_offender1 %in% relationship_intimdate_partner ] <- "intimate partner"
+  data$relationship[data$relation_of_vict_to_offender1 %in% relationship_other_family]       <- "other family"
+
   data$age_of_victim <- str_replace_all(data$age_of_victim, age_fix)
   data$age_of_victim[data$age_of_victim %in% "unknown"] <- NA
   data$age_of_victim <- as.numeric(data$age_of_victim)
@@ -154,9 +340,11 @@ prep_victim <- function(file) {
   data$race_of_victim <- tolower(data$race_of_victim)
   data$race_of_victim <- str_replace_all(data$race_of_victim, race_fix)
 
+  data <- group_theft_offenses(data)
   data$sex_of_victim       <- paste0("victim_", data$sex_of_victim)
   data$race_of_victim      <- paste0("victim_", data$race_of_victim)
   data$ethnicity_of_victim <- paste0("victim_", data$ethnicity_of_victim)
+  data$relationship        <- paste0("victim_", data$relationship)
   data$victim_injury       <- paste0("victim_", data$victim_injury)
   data$offense             <- paste("victim", data$offense)
   return(data)
@@ -195,7 +383,7 @@ prep_offender <- function(file, offense_data) {
   data$age_category[data$age_of_offender %in% 0:17]  <- "offender_juvenile"
   data$age_category[data$age_of_offender %in% 18:99] <- "offender_adult"
 
-
+  data <- group_theft_offenses(data)
   data$offense <- paste("offender", data$offense)
   return(data)
 }
@@ -241,6 +429,7 @@ prep_arrestee <- function(arrestee_file, arrestee_group_b_file) {
   data$race_of_arrestee[data$race_of_arrestee %in% c(NA, "unknown")]           <- "unknown_race"
   data$ethnicity_of_arrestee[data$ethnicity_of_arrestee %in% c(NA, "unknown")] <- "unknown_ethnicity"
 
+  data <- group_theft_offenses(data)
   data$sex_of_arrestee       <- paste0("arrestee_", data$sex_of_arrestee)
   data$race_of_arrestee      <- paste0("arrestee_", data$race_of_arrestee)
   data$ethnicity_of_arrestee <- paste0("arrestee_", data$ethnicity_of_arrestee)
@@ -285,6 +474,13 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
                      "sodomy")
   person_victim_types <- c("individual",
                            "law enforcement officer")
+  crimes_with_subtypes <- c("animal cruelty",
+                            "counterfeiting/forgery",
+                            "drug equipment violations",
+                            "drug/narcotic violations",
+                            "gambling equipment violations",
+                            "stolen property offenses (receiving, selling, etc.)",
+                            "weapon law violations")
 
   data$time_unit <- data[, time_unit]
   cols_temp <- c("ori",
@@ -308,6 +504,14 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
       temp_agg <- data %>%
         count_(cols_temp)
 
+      # Not all crimes can have subtypes.
+      # Subsets to only ones that can
+      if (variable %in% "subtype") {
+        temp_agg <-
+          data %>%
+          count_(cols_temp) %>%
+          filter(offense %in% paste("offense", crimes_with_subtypes))
+      }
       # Not all crimes can have weapons involved.
       # Subsets to only ones that can
       if (variable %in% "gun_involved") {
