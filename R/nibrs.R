@@ -35,6 +35,7 @@ batch_header <- batch_header %>%
          !is.na(state),
          !is.na(ORI))
 batch_header$state <- gsub(" V2", "", batch_header$state)
+rm(ucr); gc()
 sort(unique(batch_header$state))
 
 #get_agg_data(1991:2020)
@@ -142,7 +143,7 @@ get_agg_data <- function(years) {
   }
 }
 
-combine_agg_data <- function(type, batch_data) {
+combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
   setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
   files <- list.files(pattern = paste0("temp_agg_", type))
 
@@ -150,6 +151,10 @@ combine_agg_data <- function(type, batch_data) {
   for (file in files) {
     temp <- readRDS(file)
     temp <- temp %>% filter(toupper(ori) %in% batch_data$ORI)
+    if (!is.null(states_to_keep)) {
+      temp <- temp %>% filter(toupper(substr(ori, 1, 2)) %in% states_to_keep)
+    }
+
     temp[is.na(temp)] <- 0
     final <- bind_rows(final, temp)
     rm(temp); gc()
@@ -163,26 +168,26 @@ combine_agg_data <- function(type, batch_data) {
 
 
   names(final) <- gsub("^victim_refused_to_cooperate", "offense_victim_refused_to_cooperate",
-                      names(final))
+                       names(final))
   names(final) <- gsub("^prosecution_declined", "offense_prosecution_declined",
-                      names(final))
+                       names(final))
   names(final) <- gsub("^death_of_suspect", "offense_death_of_suspect",
-                      names(final))
+                       names(final))
   names(final) <- gsub("^extradition_denied", "offense_extradition_denied",
-                      names(final))
+                       names(final))
   names(final) <- gsub("^juvenile_no_custody", "offense_juvenile_no_custody",
-                      names(final))
+                       names(final))
   names(final) <- gsub("^cleared_by_arrest", "offense_cleared_by_arrest",
-                      names(final))
+                       names(final))
   return(final)
 }
 
 add_missing_columns <- function(data) {
-  for (col in c("arrestee_age_unknown_sports_tampering",
-                "arrestee_age_unknown_human_trafficking_commercial_sex_acts",
-                "arrestee_age_unknown_human_trafficking_involuntary_servitude",
-                "arrestee_age_unknown_hacking_computer_invasion",
-                "arrestee_age_unknown_animal_cruelty",
+  for (col in c("arrestee_unknown_age_sports_tampering",
+                "arrestee_unknown_age_human_trafficking_commercial_sex_acts",
+                "arrestee_unknown_age_human_trafficking_involuntary_servitude",
+                "arrestee_unknown_agehacking_computer_invasion",
+                "arrestee_unknown_age_animal_cruelty",
                 "arrestee_american_indian_sports_tampering",
                 "arrestee_unknown_race_sports_tampering",
                 "arrestee_american_indian_hacking_computer_invasion",
@@ -211,66 +216,71 @@ add_missing_columns <- function(data) {
 
 
 
-final_agg_year  <- combine_agg_data(type = "year", batch_header)
-final_agg_year  <- add_missing_columns(final_agg_year); gc()
-final_agg_year  <-
-  final_agg_year %>%
-  filter(ORI %in% batch_header$ORI) %>%
-  left_join(batch_header) %>%
-  select(ORI,
-         year,
-         agency,
-         state,
-         population,
-         everything()) %>%
-  filter(!is.na(agency))
-gc()
-setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs")
-make_largest_agency_json(final_agg_year)
-make_state_agency_choices(final_agg_year)
-files <- list.files(pattern = "agency_choices")
-files
-file.copy(files, "C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
-names(final_agg_year) <- gsub("age_unknown", "unknown_age", names(final_agg_year))
-final_agg_year <- final_agg_year[, -grep("demographics_total", names(final_agg_year))]
-grep("victim.*sex.*rape", names(final_agg_year), value = TRUE)
-make_agency_csvs(final_agg_year)
-rm(final_agg_year); gc()
-
-
-
-final_agg_month <- combine_agg_data(type = "month", batch_header)
-final_agg_month <- add_missing_columns(final_agg_month)
-names(final_agg_month) <- gsub("age_unknown", "unknown_age", names(final_agg_month))
-final_agg_month <- final_agg_month[, -grep("demographics_total", names(final_agg_month))]
-final_agg_month$state_abb <- substr(final_agg_month$ORI, 1, 2)
-state_abb <- unique(substr(unique(final_agg_month$ORI), 1, 2))
+#final_agg_year  <- combine_agg_data(type = "year", batch_header)
+# final_agg_year  <- add_missing_columns(final_agg_year); gc()
+# final_agg_year  <-
+#   final_agg_year %>%
+#   filter(ORI %in% batch_header$ORI) %>%
+#   left_join(batch_header) %>%
+#   select(ORI,
+#          year,
+#          agency,
+#          state,
+#          population,
+#          everything()) %>%
+#   filter(!is.na(agency))
+# gc()
+# setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs")
+# make_largest_agency_json(final_agg_year)
+# make_state_agency_choices(final_agg_year)
+# files <- list.files(pattern = "agency_choices")
+# files
+# file.copy(files, "C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
+# make_agency_csvs(final_agg_year)
+state_abb <- unique(substr(unique(final_agg_year$ORI), 1, 2))
 state_abb <- sort(state_abb)
 state_abb
-setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
-for (state_abb_temp in state_abb) {
-  temp <- final_agg_month %>% filter(state_abb %in% state_abb_temp)
-  final_agg_month <- final_agg_month %>% filter(!state_abb %in% state_abb_temp)
-  gc()
 
-  temp$state_abb <- NULL
-  temp  <-
-    temp %>%
-    mutate(date = year,
-           year = year(year)) %>%
-    filter(ORI %in% batch_header$ORI) %>%
-    left_join(batch_header, by = c("ORI", "year")) %>%
-    filter(!is.na(agency)) %>%
-    select(-year) %>%
-    rename(year = date) %>%
-    select(ORI,
-           year,
-           agency,
-           state,
-           population,
-           everything())
-  gc()
-  temp$year <- as.character(temp$year)
-  make_agency_csvs(temp, type = "month")
+# rm(final_agg_year); gc()
+
+state_abb_first_half <- state_abb[1:25]
+state_abb_second_half <- state_abb[26:length(state_abb)]
+state_abb_groups <- list(state_abb_first_half,
+                         state_abb_second_half)
+state_abb_groups
+for (i in 1:2) {
+  states_temp <- state_abb_groups[[i]]
+  final_agg_month <- combine_agg_data(type = "month", batch_header, states_temp)
+  final_agg_month <- add_missing_columns(final_agg_month)
+  final_agg_month$state_abb <- substr(final_agg_month$ORI, 1, 2)
+  state_abb <- unique(substr(unique(final_agg_year$ORI), 1, 2))
+  state_abb <- sort(state_abb)
+  state_abb
+  setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
+  for (state_abb_temp in state_abb) {
+    temp <- final_agg_month %>% filter(state_abb %in% state_abb_temp)
+    final_agg_month <- final_agg_month %>% filter(!state_abb %in% state_abb_temp)
+    gc()
+
+    temp$state_abb <- NULL
+    temp  <-
+      temp %>%
+      mutate(date = year,
+             year = year(year)) %>%
+      filter(ORI %in% batch_header$ORI) %>%
+      left_join(batch_header, by = c("ORI", "year")) %>%
+      filter(!is.na(agency)) %>%
+      select(-year) %>%
+      rename(year = date) %>%
+      select(ORI,
+             year,
+             agency,
+             state,
+             population,
+             everything())
+    gc()
+    temp$year <- as.character(temp$year)
+    make_agency_csvs(temp, type = "month")
+  }
+  rm(final_agg_month); gc()
 }
-rm(final_agg_month); gc()
