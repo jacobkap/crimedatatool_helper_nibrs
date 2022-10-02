@@ -620,7 +620,7 @@ make_csv_test <- function(temp, type) {
 }
 
 dummy_rows_missing_years <- function(data, type) {
-
+  data$year <- as.character(data$year)
   if (type == "year") {
     missing_years <- min(data$year):max(data$year)
   } else {
