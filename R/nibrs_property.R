@@ -1,5 +1,16 @@
 source("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
 
+#999999999 999999998
+
+repeated_numbers <- c()
+for (i in 1:9) {
+  for (n in 5:9) {
+    repeated_numbers <- c(repeated_numbers, strrep(i, n))
+  }
+}
+repeated_numbers <- c(repeated_numbers, 12345, 123456, 1234567, 12345678, 123456789)
+table(data$value %in% parse_number(repeated_numbers))
+
 batch_header_files <- list.files(pattern = "batch.*rds")
 batch_header_files <- batch_header_files[-grep("zip", batch_header_files)]
 batch_header <- data.frame()
@@ -44,14 +55,20 @@ for (i in 1:length(property_files)) {
     select(ori,
            date = incident_date,
            type_of_property_loss,
-           property_description) %>%
+           value = value_of_property,
+           property_description,
+           suspected_drug_type_1,
+           suspected_drug_type_2,
+           suspected_drug_type_3) %>%
     filter(!type_of_property_loss %in% c("unknown", "none")) %>%
     mutate(date  = ymd(date),
            year  = year(date),
-           month = floor_date(date, unit = "month"))
+           month = floor_date(date, unit = "month"),
+           value = parse_number(value))
   data$type_of_property_loss[data$type_of_property_loss %in% "stolen/etc. (includes bribed, defrauded, embezzled, extorted, ransomed, robbed, etc.)"] <- "stolen"
   data$type_of_property_loss[data$type_of_property_loss %in% "destroyed/damaged/vandalized"] <- "destroyed"
   data$type_of_property_loss[data$type_of_property_loss %in% "counterfeited/forged"] <- "counterfeited"
+
   data_agg_yearly  <- get_property_agg(data, "year")
   data_agg_monthly <- get_property_agg(data, "month")
 
@@ -92,6 +109,11 @@ final_data_agg_yearly <-
          population,
          everything())
 
+names(final_data_agg_yearly)  <- gsub("property_", "", names(final_data_agg_yearly))
+names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
+
+gc(); Sys.sleep(5)
+
 setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property")
 make_agency_csvs(final_data_agg_yearly)
 make_largest_agency_json(final_data_agg_yearly)
@@ -107,6 +129,15 @@ get_property_agg <- function(data, time_unit) {
   for (property_type in unique(data$type_of_property_loss)) {
     data$time_unit <- data[, time_unit]
 
+    temp_agg_value <-
+      data %>%
+      filter(type_of_property_loss %in% property_type) %>%
+      group_by(ori, time_unit, property_description) %>%
+      summarize(mean_value   = mean(value, na.rm = TRUE),
+                median_value = median(value, na.rm = TRUE)) %>%
+      pivot_wider(names_from  = property_description,
+                  values_from = c(mean_value, median_value))
+
     temp_agg <-
       data %>%
       filter(type_of_property_loss %in% property_type) %>%
@@ -115,7 +146,14 @@ get_property_agg <- function(data, time_unit) {
       pivot_wider(names_from  = property_description,
                   values_from = n)
 
+    temp_agg <-
+      temp_agg %>%
+      left_join(temp_agg_value, by = c("ori", "time_unit"))
+
     names(temp_agg)[3:ncol(temp_agg)] <- paste0("property_", property_type, "_", names(temp_agg)[3:ncol(temp_agg)])
+
+
+
 
     if (nrow(main_agg) == 0) {
       main_agg <- temp_agg
@@ -126,6 +164,43 @@ get_property_agg <- function(data, time_unit) {
     }
 
   }
+  # Get drugs
+  data_drugs1 <-
+    data %>%
+    select(ori,
+           time_unit,
+           drug = suspected_drug_type_1)
+  data_drugs2 <-
+    data %>%
+    select(ori,
+           time_unit,
+           drug = suspected_drug_type_2)
+  data_drugs3 <-
+    data %>%
+    select(ori,
+           time_unit,
+           drug = suspected_drug_type_3)
+
+  data_drugs <-
+    data_drugs1 %>%
+    bind_rows(data_drugs2) %>%
+    bind_rows(data_drugs3)
+  data_drugs$drug <- gsub(":.*| \\(.*", "", data_drugs$drug)
+
+  drugs_agg <-
+    data_drugs %>%
+    filter(!is.na(drug)) %>%
+    group_by(ori, time_unit) %>%
+    count(drug) %>%
+    pivot_wider(names_from  = drug,
+                values_from = n) %>%
+    rename_all(make_clean_names)
+  names(drugs_agg)[3:ncol(drugs_agg)] <- paste0("drugs_", names(drugs_agg)[3:ncol(drugs_agg)])
+
+  main_agg <-
+    main_agg %>%
+    left_join(drugs_agg, by = c("ori", "time_unit"))
+
   names(main_agg) <- gsub("^time_unit$", "year", names(main_agg))
   if (time_unit %in% "month") {
     main_year <- names(sort(table(year(main_agg$year)), decreasing = TRUE)[1])
@@ -145,5 +220,3 @@ get_property_agg <- function(data, time_unit) {
   main_agg[is.na(main_agg)] <- 0
   return(main_agg)
 }
-
-
