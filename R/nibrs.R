@@ -22,6 +22,12 @@ for (file in batch_header_files) {
   batch_header <- bind_rows(batch_header, temp)
 }
 
+data <- readRDS(admin_files[1]) %>%
+  mutate(month = floor_date(ymd(incident_date), unit = "month")) %>%
+  distinct(ori, month, .keep_all = TRUE) %>%
+  count(ori) %>%
+  rename(number_of_months_reported = n)
+
 ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2020.rds") %>%
   select(ORI = ori9,
          agency = crosswalk_agency_name) %>%

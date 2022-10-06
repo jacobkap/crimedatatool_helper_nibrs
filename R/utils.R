@@ -9,6 +9,7 @@ library(splitstackshape)
 library(crimeutils)
 library(here)
 library(parallel)
+library(readr)
 age_fix <- c("over 98 years old"            = "99",
              "under 24 hours \\(neonate\\)" = "0",
              "1-6 days old"                 = "0",
@@ -644,6 +645,7 @@ dummy_rows_missing_years <- function(data, type) {
       temp %>%
       dplyr::mutate_at(vars(-one_of("year", "agency", "state", "ORI")),
                        make_all_na)
+    temp$year <- as.character(temp$year)
 
     data <-
       data %>%

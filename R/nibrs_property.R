@@ -1,5 +1,15 @@
 source("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
-
+library(blscrapeR)
+# https://www.usinflationcalculator.com/
+inflation <- inflation_adjust(2021) %>%
+  select(year,
+         pct_increase)
+inflation$multiplier   <- inflation$pct_increase / 100
+inflation$multiplier   <- abs(inflation$multiplier)
+inflation$multiplier   <- 1-inflation$multiplier
+inflation$multiplier   <- 1/inflation$multiplier
+inflation$year         <- as.numeric(inflation$year)
+inflation$pct_increase <- NULL
 #999999999 999999998
 
 repeated_numbers <- c()
@@ -8,8 +18,7 @@ for (i in 1:9) {
     repeated_numbers <- c(repeated_numbers, strrep(i, n))
   }
 }
-repeated_numbers <- c(repeated_numbers, 12345, 123456, 1234567, 12345678, 123456789)
-table(data$value %in% parse_number(repeated_numbers))
+repeated_numbers <- c(repeated_numbers, 12345, 123456, 1234567, 12345678, 123456789, 999999998, 999999996)
 
 batch_header_files <- list.files(pattern = "batch.*rds")
 batch_header_files <- batch_header_files[-grep("zip", batch_header_files)]
@@ -63,39 +72,47 @@ for (i in 1:length(property_files)) {
     filter(!type_of_property_loss %in% c("unknown", "none")) %>%
     mutate(date  = ymd(date),
            year  = year(date),
-           month = floor_date(date, unit = "month"),
-           value = parse_number(value))
+           month = floor_date(date, unit = "month")) %>%
+    left_join(inflation, by = "year")
+  data$value[data$value %in% "unknown"] <- NA
+  data$value <- parse_number(data$value)
+  data$value[data$value %in% repeated_numbers] <- NA
+  data$value[data$value >= 100000000] <- NA
+
+  # Adjusted to 2021 cumulative inflation
+  data$value <- data$value * data$multiplier
+
   data$type_of_property_loss[data$type_of_property_loss %in% "stolen/etc. (includes bribed, defrauded, embezzled, extorted, ransomed, robbed, etc.)"] <- "stolen"
   data$type_of_property_loss[data$type_of_property_loss %in% "destroyed/damaged/vandalized"] <- "destroyed"
   data$type_of_property_loss[data$type_of_property_loss %in% "counterfeited/forged"] <- "counterfeited"
 
   data_agg_yearly  <- get_property_agg(data, "year")
-  data_agg_monthly <- get_property_agg(data, "month")
+ # data_agg_monthly <- get_property_agg(data, "month")
 
 
   final_data_agg_yearly  <- bind_rows(final_data_agg_yearly, data_agg_yearly)
-  final_data_agg_monthly <- bind_rows(final_data_agg_monthly, data_agg_monthly)
+ # final_data_agg_monthly <- bind_rows(final_data_agg_monthly, data_agg_monthly)
 
   final_data_agg_yearly[is.na(final_data_agg_yearly)]   <- 0
-  final_data_agg_monthly[is.na(final_data_agg_monthly)] <- 0
+ # final_data_agg_monthly[is.na(final_data_agg_monthly)] <- 0
   message(property_files[i])
 }
-final_data_agg_monthly <-
-  final_data_agg_monthly %>%
-  filter(paste(ori, year(year)) %in% paste(batch_header$ORI, batch_header$year)) %>%
-  mutate(month = year,
-         year = year(year)) %>%
-  rename(ORI = ori) %>%
-  left_join(batch_header) %>%
-  select(ORI,
-         year,
-         month,
-         agency,
-         state,
-         population,
-         everything()) %>%
-  select(-year) %>%
-  rename(year = month)
+# final_data_agg_monthly <-
+#   final_data_agg_monthly %>%
+#   filter(paste(ori, year(year)) %in% paste(batch_header$ORI, batch_header$year)) %>%
+#   mutate(month = year,
+#          year = year(year)) %>%
+#   rename(ORI = ori) %>%
+#   left_join(batch_header) %>%
+#   select(ORI,
+#          year,
+#          month,
+#          agency,
+#          state,
+#          population,
+#          everything()) %>%
+#   select(-year) %>%
+#   rename(year = month)
 
 final_data_agg_yearly <-
   final_data_agg_yearly %>%
@@ -110,7 +127,8 @@ final_data_agg_yearly <-
          everything())
 
 names(final_data_agg_yearly)  <- gsub("property_", "", names(final_data_agg_yearly))
-names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
+names(final_data_agg_yearly)
+#names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
 
 gc(); Sys.sleep(5)
 
@@ -129,12 +147,15 @@ get_property_agg <- function(data, time_unit) {
   for (property_type in unique(data$type_of_property_loss)) {
     data$time_unit <- data[, time_unit]
 
+    options(dplyr.summarise.inform = FALSE)
     temp_agg_value <-
       data %>%
       filter(type_of_property_loss %in% property_type) %>%
       group_by(ori, time_unit, property_description) %>%
-      summarize(mean_value   = mean(value, na.rm = TRUE),
-                median_value = median(value, na.rm = TRUE)) %>%
+      summarize(mean_value    = mean(value, na.rm = TRUE),
+                median_value  = median(value, na.rm = TRUE)) %>%
+      mutate(mean_value = round(mean_value),
+             median_value = round(median_value)) %>%
       pivot_wider(names_from  = property_description,
                   values_from = c(mean_value, median_value))
 
@@ -184,7 +205,8 @@ get_property_agg <- function(data, time_unit) {
   data_drugs <-
     data_drugs1 %>%
     bind_rows(data_drugs2) %>%
-    bind_rows(data_drugs3)
+    bind_rows(data_drugs3) %>%
+    filter(drug != "over 3 drug types")
   data_drugs$drug <- gsub(":.*| \\(.*", "", data_drugs$drug)
 
   drugs_agg <-
