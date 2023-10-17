@@ -130,6 +130,116 @@ subtype_sell_create_assist <- c("cultivating/manufacturing/publishing",
                                 "transporting/transmitting/importing",
                                 "operating/promoting/assisting")
 
+
+
+combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
+  setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
+  files <- list.files(pattern = paste0("temp_agg_", type))
+  if (type %in% c("year", "month")) {
+    files <- files[-grep("property", files)]
+  }
+  print(files)
+  final <- data.frame()
+  for (file in files) {
+    temp <- readRDS(file)
+    if (!is.null(states_to_keep)) {
+      temp <- temp %>% filter(toupper(substr(ori, 1, 2)) %in% states_to_keep)
+    }
+
+
+    final <- bind_rows(final, temp)
+    rm(temp); gc(); Sys.sleep(0.2)
+    message(file)
+  }
+
+  if (any(grepl("30a|61a|90k", names(final)))) {
+    final <- final[, -grep("30a|61a|90k", names(final))]
+  }
+  final$ori <- toupper(final$ori)
+  final <- final %>% rename(year = time_unit,
+                            ORI  = ori)
+
+  if (grepl("month", files[1])) {
+    final <-
+      final %>%
+      filter(paste(ORI, year(year)) %in% paste(batch_header$ORI, batch_header$year))
+  } else {
+    final <-
+      final %>%
+      filter(paste(ORI, year) %in% paste(batch_header$ORI, batch_header$year))
+  }
+
+
+  names(final) <- gsub("^victim_refused_to_cooperate", "offense_victim_refused_to_cooperate",
+                       names(final))
+  names(final) <- gsub("^prosecution_declined", "offense_prosecution_declined",
+                       names(final))
+  names(final) <- gsub("^death_of_suspect", "offense_death_of_suspect",
+                       names(final))
+  names(final) <- gsub("^extradition_denied", "offense_extradition_denied",
+                       names(final))
+  names(final) <- gsub("^juvenile_no_custody", "offense_juvenile_no_custody",
+                       names(final))
+  names(final) <- gsub("^cleared_by_arrest", "offense_cleared_by_arrest",
+                       names(final))
+
+  final[is.na(final)] <- 0
+  return(final)
+}
+
+
+get_batch_header <- function() {
+  setwd("D:/ucr_data_storage/clean_data/nibrs")
+  admin_files    <- list.files(pattern = "admin.*rds$")
+  batch_header_files <- list.files(pattern = "batch.*rds")
+  batch_header <- data.frame()
+  for (file in batch_header_files) {
+    temp <- readRDS(file) %>%
+      select(ORI = ori,
+             year,
+             state,
+             population)
+    message(file)
+    batch_header <- bind_rows(batch_header, temp)
+  }
+
+  months_reported <- data.frame()
+  for (file in admin_files) {
+    temp <- readRDS(file) %>%
+      mutate(month = floor_date(ymd(incident_date), unit = "month")) %>%
+      filter(year(month) %in% unique(year)) %>%
+      distinct(ori, year, month, .keep_all = TRUE) %>%
+      count(ori, year) %>%
+      rename(number_of_months_reported = n) %>%
+      filter(number_of_months_reported %in% 12) %>%
+      select(-number_of_months_reported)
+    message(file)
+    gc()
+    months_reported <- bind_rows(months_reported, temp)
+  }
+
+  batch_header <- months_reported %>%
+    rename(ORI = ori) %>%
+    left_join(batch_header)
+
+
+  ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2021.rds") %>%
+    select(ORI = ori9,
+           agency = crosswalk_agency_name) %>%
+    distinct(ORI, .keep_all = TRUE)
+
+  batch_header <- batch_header %>%
+    left_join(ucr) %>%
+    filter(!is.na(agency)) %>%
+    mutate(agency = capitalize_words(agency)) %>%
+    filter(!is.na(agency),
+           !is.na(state),
+           !is.na(ORI))
+  batch_header$state <- gsub(" V2", "", batch_header$state)
+  gc()
+  return(batch_header)
+}
+
 group_theft_offenses <- function(data) {
   data$offense[data$offense %in% theft_crimes] <- "theft"
   return(data)
@@ -153,16 +263,16 @@ prep_admin <- function(file) {
            cleared_exceptionally) %>%
     mutate_if(is.character, tolower)
 
-    data$cleared <- "not cleared"
-    data$cleared[data$cleared_exceptionally %in% c("victim refused to cooperate")] <- "victim refused to cooperate"
-    data$cleared[data$cleared_exceptionally %in% "prosecution declined (for other than lack of probable cause)"] <- "prosecution declined"
-    data$cleared[data$cleared_exceptionally %in% "death of offender"] <- "death of suspect"
-    data$cleared[data$cleared_exceptionally %in% "extradition denied"] <- "extradition denied"
-    data$cleared[data$cleared_exceptionally %in% "juvenile/no custody"] <- "juvenile/no custody"
+  data$cleared <- "not cleared"
+  data$cleared[data$cleared_exceptionally %in% c("victim refused to cooperate")] <- "victim refused to cooperate"
+  data$cleared[data$cleared_exceptionally %in% "prosecution declined (for other than lack of probable cause)"] <- "prosecution declined"
+  data$cleared[data$cleared_exceptionally %in% "death of offender"] <- "death of suspect"
+  data$cleared[data$cleared_exceptionally %in% "extradition denied"] <- "extradition denied"
+  data$cleared[data$cleared_exceptionally %in% "juvenile/no custody"] <- "juvenile/no custody"
 
-    data$cleared[data$total_arrestee_segments > 0] <- "cleared by arrest"
-data$total_arrestee_segments <- NULL
-data$cleared_exceptionally   <- NULL
+  data$cleared[data$total_arrestee_segments > 0] <- "cleared by arrest"
+  data$total_arrestee_segments <- NULL
+  data$cleared_exceptionally   <- NULL
   return(data)
 }
 
@@ -237,7 +347,6 @@ prep_offense <- function(file) {
   data$location[data$location_type %in% location_outside]              <- "outside"
 
   data <- group_theft_offenses(data)
-  data$cleared      <- paste("offense", data$cleared)
   data$offense      <- paste("offense", data$offense)
   data$subtype      <- paste("offense", data$subtype)
   data$gun_involved <- paste("offense", data$gun_involved)
@@ -591,7 +700,6 @@ make_state_agency_choices <- function(data) {
 
 make_agency_csvs <- function(data,
                              type = "year") {
-
   data <-
     data %>%
     dplyr::group_split(ORI)

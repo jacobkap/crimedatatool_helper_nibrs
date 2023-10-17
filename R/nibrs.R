@@ -1,230 +1,185 @@
-source("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
+source("E:/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
 
-admin_files    <- list.files(pattern = "admin.*rds$")
-offense_files  <- list.files(pattern = "offense.*rds$")
-victim_files   <- list.files(pattern = "victim.*rds$")
+admin_files <- list.files(pattern = "admin.*rds$")
+offense_files <- list.files(pattern = "offense.*rds$")
+victim_files <- list.files(pattern = "victim.*rds$")
 offender_files <- list.files(pattern = "offender.*rds$")
 arrestee_files <- list.files(pattern = "nibrs_arrestee.*rds$")
 arrestee_group_b_files <- list.files(pattern = "group_b.*rds$")
 
-setwd("D:/ucr_data_storage/clean_data/nibrs")
-batch_header_files <- list.files(pattern = "batch.*rds")
-batch_header <- data.frame()
-for (file in batch_header_files) {
-  temp <- readRDS(file) %>%
-    select(ORI = ori,
-           year,
-           state,
-           population)
-  message(file)
-  batch_header <- bind_rows(batch_header, temp)
-}
-
-months_reported <- data.frame()
-for (file in admin_files) {
-  temp <- readRDS(file) %>%
-    mutate(month = floor_date(ymd(incident_date), unit = "month")) %>%
-    distinct(ori, year, month, .keep_all = TRUE) %>%
-    count(ori, year) %>%
-    rename(number_of_months_reported = n) %>%
-    filter(number_of_months_reported %in% 12)
-  message(file)
-  gc()
-  months_reported <- bind_rows(months_reported, temp)
-}
-
-batch_header <- months_reported %>%
-  rename(ORI = ori) %>%
-  left_join(batch_header)
-
-data <- readRDS(admin_files[1]) %>%
-  mutate(month = floor_date(ymd(incident_date), unit = "month")) %>%
-  distinct(ori, month, .keep_all = TRUE) %>%
-  count(ori) %>%
-  rename(number_of_months_reported = n)
-
-ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2020.rds") %>%
-  select(ORI = ori9,
-         agency = crosswalk_agency_name) %>%
-  distinct(ORI, .keep_all = TRUE)
-
-batch_header <- batch_header %>%
-  left_join(ucr) %>%
-  filter(!is.na(agency)) %>%
-  mutate(agency = capitalize_words(agency)) %>%
-  filter(!is.na(agency),
-         !is.na(state),
-         !is.na(ORI))
-batch_header$state <- gsub(" V2", "", batch_header$state)
-rm(ucr); gc()
+setwd("F:/ucr_data_storage/clean_data/nibrs")
+batch_header <- get_batch_header()
 sort(unique(batch_header$state))
 
-get_agg_data(1991:2021)
+get_agg_data(1991:2022)
 get_agg_data <- function(years) {
   for (year_temp in years) {
     offense <- prep_offense(offense_files[grep(year_temp, offense_files)])
-    admin   <- prep_admin(admin_files[grep(year_temp, admin_files)])
+    admin <- prep_admin(admin_files[grep(year_temp, admin_files)])
     offense <-
       offense %>%
       left_join(admin)
 
     offense_small <- offense %>%
-      select(ori,
-             unique_incident_id,
-             offense)
+      select(
+        ori,
+        unique_incident_id,
+        offense
+      )
     offense_agg_year <- aggregate_data(offense,
-                                       variables = c("gun_involved",
-                                                     "cleared",
-                                                     "location",
-                                                     'subtype'),
-                                       time_unit = "year")
+      variables = c(
+        "gun_involved",
+        "cleared",
+        "location",
+        "subtype"
+      ),
+      time_unit = "year"
+    )
     offense_agg_month <- aggregate_data(offense,
-                                        variables = c("gun_involved",
-                                                      "cleared",
-                                                      "location",
-                                                      "subtype"),
-                                        time_unit = "date")
-    rm(offense); gc()
+      variables = c(
+        "gun_involved",
+        "cleared",
+        "location",
+        "subtype"
+      ),
+      time_unit = "date"
+    )
+    rm(offense)
+    gc()
 
-    offender <- prep_offender(offender_files[grep(year_temp, offender_files)],
-                              offense_small)
+    offender <- prep_offender(
+      offender_files[grep(year_temp, offender_files)],
+      offense_small
+    )
     offender_agg_year <- aggregate_data(offender,
-                                        variables = c("sex_of_offender",
-                                                      "race_of_offender",
-                                                      "age_category"),
-                                        time_unit = "year")
+      variables = c(
+        "sex_of_offender",
+        "race_of_offender",
+        "age_category"
+      ),
+      time_unit = "year"
+    )
     offender_agg_month <- aggregate_data(offender,
-                                         variables = c("sex_of_offender",
-                                                       "race_of_offender",
-                                                       "age_category"),
-                                         time_unit = "date")
-    rm(offender); gc()
+      variables = c(
+        "sex_of_offender",
+        "race_of_offender",
+        "age_category"
+      ),
+      time_unit = "date"
+    )
+    rm(offender)
+    gc()
 
-    arrestee <- prep_arrestee(arrestee_files[grep(year_temp, arrestee_files)],
-                              arrestee_group_b_files[grep(year_temp, arrestee_group_b_files)]) %>%
+    arrestee <- prep_arrestee(
+      arrestee_files[grep(year_temp, arrestee_files)],
+      arrestee_group_b_files[grep(year_temp, arrestee_group_b_files)]
+    ) %>%
       filter(ori %in% offense_small$ori)
     arrestee_agg_year <- aggregate_data(arrestee,
-                                        variables = c("sex_of_arrestee",
-                                                      "race_of_arrestee",
-                                                      "ethnicity_of_arrestee",
-                                                      "age_category",
-                                                      "type_of_arrest"),
-                                        time_unit = "year")
+      variables = c(
+        "sex_of_arrestee",
+        "race_of_arrestee",
+        "ethnicity_of_arrestee",
+        "age_category",
+        "type_of_arrest"
+      ),
+      time_unit = "year"
+    )
     arrestee_agg_month <- aggregate_data(arrestee,
-                                         variables = c("sex_of_arrestee",
-                                                       "race_of_arrestee",
-                                                       "ethnicity_of_arrestee",
-                                                       "age_category",
-                                                       "type_of_arrest"),
-                                         time_unit = "date")
-    rm(arrestee); gc()
+      variables = c(
+        "sex_of_arrestee",
+        "race_of_arrestee",
+        "ethnicity_of_arrestee",
+        "age_category",
+        "type_of_arrest"
+      ),
+      time_unit = "date"
+    )
+    rm(arrestee)
+    gc()
 
     victim <- prep_victim(victim_files[grep(year_temp, victim_files)]) %>%
       filter(ori %in% offense_small$ori)
     victim_agg_year <- aggregate_data(victim,
-                                      variables = c("sex_of_victim",
-                                                    "race_of_victim",
-                                                    "ethnicity_of_victim",
-                                                    "age_category",
-                                                    "victim_injury",
-                                                    "relationship"),
-                                      time_unit = "year",
-                                      victim_type = TRUE)
+      variables = c(
+        "sex_of_victim",
+        "race_of_victim",
+        "ethnicity_of_victim",
+        "age_category",
+        "victim_injury",
+        "relationship"
+      ),
+      time_unit = "year",
+      victim_type = TRUE
+    )
     victim_agg_month <- aggregate_data(victim,
-                                       variables = c("sex_of_victim",
-                                                     "race_of_victim",
-                                                     "ethnicity_of_victim",
-                                                     "age_category",
-                                                     "victim_injury",
-                                                     "relationship"),
-                                       time_unit = "date",
-                                       victim_type = TRUE)
+      variables = c(
+        "sex_of_victim",
+        "race_of_victim",
+        "ethnicity_of_victim",
+        "age_category",
+        "victim_injury",
+        "relationship"
+      ),
+      time_unit = "date",
+      victim_type = TRUE
+    )
 
-    rm(victim); gc()
-    rm(offense_small); gc()
+    rm(victim)
+    gc()
+    rm(offense_small)
+    gc()
 
 
     temp_agg_year <- offense_agg_year %>%
-      left_join(offender_agg_year,                  by = c("ori", "time_unit")) %>%
-      left_join(arrestee_agg_year,                  by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_year,                    by = c("ori", "time_unit"))
+      left_join(offender_agg_year, by = c("ori", "time_unit")) %>%
+      left_join(arrestee_agg_year, by = c("ori", "time_unit")) %>%
+      left_join(victim_agg_year, by = c("ori", "time_unit"))
 
 
-    saveRDS(temp_agg_year,
-            paste0("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_year_", year_temp, ".rds"))
+    saveRDS(
+      temp_agg_year,
+      paste0("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_year_", year_temp, ".rds")
+    )
 
     temp_agg_month <- offense_agg_month %>%
-      left_join(offender_agg_month,                  by = c("ori", "time_unit")) %>%
-      left_join(arrestee_agg_month,                  by = c("ori", "time_unit")) %>%
-      left_join(victim_agg_month,                    by = c("ori", "time_unit"))
-    saveRDS(temp_agg_month,
-            paste0("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_", year_temp, ".rds"))
+      left_join(offender_agg_month, by = c("ori", "time_unit")) %>%
+      left_join(arrestee_agg_month, by = c("ori", "time_unit")) %>%
+      left_join(victim_agg_month, by = c("ori", "time_unit"))
+    saveRDS(
+      temp_agg_month,
+      paste0("E:Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_", year_temp, ".rds")
+    )
 
     message(year_temp)
   }
 }
 
-combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
-  setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
-  files <- list.files(pattern = paste0("temp_agg_", type))
-
-  final <- data.frame()
-  for (file in files) {
-    temp <- readRDS(file)
-    temp <- temp %>% filter(toupper(ori) %in% batch_data$ORI)
-    if (!is.null(states_to_keep)) {
-      temp <- temp %>% filter(toupper(substr(ori, 1, 2)) %in% states_to_keep)
-    }
-
-    temp[is.na(temp)] <- 0
-    final <- bind_rows(final, temp)
-    rm(temp); gc()
-    message(file)
-  }
-
-  final <- final[, -grep("30a|61a|90k", names(final))]
-  final$ori <- toupper(final$ori)
-  final <- final %>% rename(year = time_unit,
-                            ORI  = ori)
-
-
-  names(final) <- gsub("^victim_refused_to_cooperate", "offense_victim_refused_to_cooperate",
-                       names(final))
-  names(final) <- gsub("^prosecution_declined", "offense_prosecution_declined",
-                       names(final))
-  names(final) <- gsub("^death_of_suspect", "offense_death_of_suspect",
-                       names(final))
-  names(final) <- gsub("^extradition_denied", "offense_extradition_denied",
-                       names(final))
-  names(final) <- gsub("^juvenile_no_custody", "offense_juvenile_no_custody",
-                       names(final))
-  names(final) <- gsub("^cleared_by_arrest", "offense_cleared_by_arrest",
-                       names(final))
-  return(final)
-}
 
 add_missing_columns <- function(data) {
-  for (col in c("arrestee_unknown_age_sports_tampering",
-                "arrestee_unknown_age_human_trafficking_commercial_sex_acts",
-                "arrestee_unknown_age_human_trafficking_involuntary_servitude",
-                "arrestee_unknown_agehacking_computer_invasion",
-                "arrestee_unknown_age_animal_cruelty",
-                "arrestee_american_indian_sports_tampering",
-                "arrestee_unknown_race_sports_tampering",
-                "arrestee_american_indian_hacking_computer_invasion",
-                "arrestee_white_sports_tampering",
-                "offender_american_indian_sports_tampering",
-                "victim_unknown_sex_rape",
-                "victim_unknown_sex_statutory_rape",
-                "offense_victim_refused_to_cooperate_sports_tampering",
-                "offense_death_of_suspect_sports_tampering",
-                "offense_death_of_suspect_purchasing_prostitution",
-                "offense_death_of_suspect_human_trafficking_involuntary_servitude",
-                "offense_extradition_denied_sports_tampering",
-                "offense_juvenile_no_custody_gambling_equipment_violations",
-                "offense_juvenile_no_custody_sports_tampering",
-                "offense_juvenile_no_custody_purchasing_prostitution",
-                "offense_juvenile_no_custody_human_trafficking_involuntary_servitude")) {
+  for (col in c(
+    "arrestee_unknown_age_sports_tampering",
+    "arrestee_unknown_age_human_trafficking_commercial_sex_acts",
+    "arrestee_unknown_age_human_trafficking_involuntary_servitude",
+    "arrestee_unknown_agehacking_computer_invasion",
+    "arrestee_unknown_age_animal_cruelty",
+    "arrestee_american_indian_sports_tampering",
+    "arrestee_unknown_race_sports_tampering",
+    "arrestee_american_indian_hacking_computer_invasion",
+    "arrestee_white_sports_tampering",
+    "offender_american_indian_sports_tampering",
+    "victim_unknown_sex_rape",
+    "victim_unknown_sex_statutory_rape",
+    "offense_victim_refused_to_cooperate_sports_tampering",
+    "offense_death_of_suspect_sports_tampering",
+    "offense_death_of_suspect_purchasing_prostitution",
+    "offense_death_of_suspect_human_trafficking_involuntary_servitude",
+    "offense_extradition_denied_sports_tampering",
+    "offense_juvenile_no_custody_gambling_equipment_violations",
+    "offense_juvenile_no_custody_sports_tampering",
+    "offense_juvenile_no_custody_purchasing_prostitution",
+    "offense_juvenile_no_custody_human_trafficking_involuntary_servitude"
+  )) {
     if (!all(grepl(col, names(data)))) {
       data[, col] <- 0
     }
@@ -237,37 +192,43 @@ add_missing_columns <- function(data) {
 
 
 
-final_agg_year  <- combine_agg_data(type = "year", batch_header)
-final_agg_year  <- add_missing_columns(final_agg_year); gc()
-final_agg_year  <-
+final_agg_year <- combine_agg_data(type = "year", batch_header)
+final_agg_year <- add_missing_columns(final_agg_year)
+gc()
+final_agg_year <-
   final_agg_year %>%
   filter(ORI %in% batch_header$ORI) %>%
   left_join(batch_header) %>%
-  select(ORI,
-         year,
-         agency,
-         state,
-         population,
-         everything()) %>%
+  select(
+    ORI,
+    year,
+    agency,
+    state,
+    population,
+    everything()
+  ) %>%
   filter(!is.na(agency))
 gc()
-setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs")
+setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs")
 make_largest_agency_json(final_agg_year)
 make_state_agency_choices(final_agg_year)
 files <- list.files(pattern = "agency_choices")
 files
-file.copy(files, "C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
+file.copy(files, "E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
 make_agency_csvs(final_agg_year)
 state_abb <- unique(substr(unique(final_agg_year$ORI), 1, 2))
 state_abb <- sort(state_abb)
 state_abb
 
-rm(final_agg_year); gc()
+rm(final_agg_year)
+gc()
 
 state_abb_first_half <- state_abb[1:25]
 state_abb_second_half <- state_abb[26:length(state_abb)]
-state_abb_groups <- list(state_abb_first_half,
-                         state_abb_second_half)
+state_abb_groups <- list(
+  state_abb_first_half,
+  state_abb_second_half
+)
 state_abb_groups
 for (i in 1:2) {
   states_temp <- state_abb_groups[[i]]
@@ -277,31 +238,36 @@ for (i in 1:2) {
   state_abb <- unique(substr(unique(final_agg_year$ORI), 1, 2))
   state_abb <- sort(state_abb)
   state_abb
-  setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
+  setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_monthly")
   for (state_abb_temp in state_abb) {
     temp <- final_agg_month %>% filter(state_abb %in% state_abb_temp)
     final_agg_month <- final_agg_month %>% filter(!state_abb %in% state_abb_temp)
     gc()
 
     temp$state_abb <- NULL
-    temp  <-
+    temp <-
       temp %>%
-      mutate(date = year,
-             year = year(year)) %>%
+      mutate(
+        date = year,
+        year = year(year)
+      ) %>%
       filter(ORI %in% batch_header$ORI) %>%
       left_join(batch_header, by = c("ORI", "year")) %>%
       filter(!is.na(agency)) %>%
       select(-year) %>%
       rename(year = date) %>%
-      select(ORI,
-             year,
-             agency,
-             state,
-             population,
-             everything())
+      select(
+        ORI,
+        year,
+        agency,
+        state,
+        population,
+        everything()
+      )
     gc()
     temp$year <- as.character(temp$year)
     make_agency_csvs(temp, type = "month")
   }
-  rm(final_agg_month); gc()
+  rm(final_agg_month)
+  gc()
 }
