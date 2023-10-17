@@ -1,18 +1,34 @@
 source("E:/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
 library(blscrapeR)
 # https://www.usinflationcalculator.com/
-inflation <- inflation_adjust(2022) %>%
-  select(
-    year,
-    pct_increase
-  )
-inflation$multiplier <- inflation$pct_increase / 100
-inflation$multiplier <- abs(inflation$multiplier)
-inflation$multiplier <- 1 - inflation$multiplier
-inflation$multiplier <- 1 / inflation$multiplier
-inflation$year <- as.numeric(inflation$year)
-inflation$pct_increase <- NULL
+# inflation <- inflation_adjust(2022) %>%
+#   select(
+#     year,
+#     pct_increase
+#   )
+# inflation$multiplier <- inflation$pct_increase / 100
+# inflation$multiplier <- abs(inflation$multiplier)
+# inflation$multiplier <- 1 - inflation$multiplier
+# inflation$multiplier <- 1 / inflation$multiplier
+# inflation$year <- as.numeric(inflation$year)
+# inflation$pct_increase <- NULL
 # 999999999 999999998
+library(quantmod)
+# https://stackoverflow.com/questions/12590180/inflation-adjusted-prices-package
+inflation <- getSymbols("CPIAUCSL", src='FRED')
+avg.cpi <- apply.yearly(CPIAUCSL, mean)
+cf <- avg.cpi/as.numeric(avg.cpi['2022']) #using 2022 as the base year
+cf <- as.data.frame(cf)
+cf$year <- rownames(cf)
+rownames(cf) <- 1:nrow(cf)
+cf <-
+  cf %>%
+  rename(inflation_adjuster = CPIAUCSL)
+cf$year <- year(cf$year)
+inflation <- cf
+inflation$multiplier <- inflation$inflation_adjuster
+
+
 
 repeated_numbers <- c()
 for (i in 1:9) {
@@ -135,14 +151,14 @@ names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_mont
 gc()
 Sys.sleep(5)
 
-setwd("E:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property")
+setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property")
 make_agency_csvs(final_data_agg_yearly)
 make_largest_agency_json(final_data_agg_yearly)
 make_state_agency_choices(final_data_agg_yearly)
 files <- list.files(pattern = "agency_choices")
 files
-file.copy(files, "E:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
-setwd("E:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
+file.copy(files, "E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
+setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
 make_agency_csvs(final_data_agg_monthly, type = "month")
 
 get_property_agg <- function(data, time_unit) {

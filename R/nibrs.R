@@ -10,7 +10,7 @@ arrestee_group_b_files <- list.files(pattern = "group_b.*rds$")
 setwd("F:/ucr_data_storage/clean_data/nibrs")
 batch_header <- get_batch_header()
 sort(unique(batch_header$state))
-
+setwd("F:/ucr_data_storage/clean_data/nibrs")
 get_agg_data(1991:2022)
 get_agg_data <- function(years) {
   for (year_temp in years) {
@@ -26,7 +26,7 @@ get_agg_data <- function(years) {
         unique_incident_id,
         offense
       )
-    offense_agg_year <- aggregate_data(offense,
+    offense_agg_year <- suppressWarnings(aggregate_data(offense,
       variables = c(
         "gun_involved",
         "cleared",
@@ -34,8 +34,8 @@ get_agg_data <- function(years) {
         "subtype"
       ),
       time_unit = "year"
-    )
-    offense_agg_month <- aggregate_data(offense,
+    ))
+    offense_agg_month <- suppressWarnings(aggregate_data(offense,
       variables = c(
         "gun_involved",
         "cleared",
@@ -43,7 +43,7 @@ get_agg_data <- function(years) {
         "subtype"
       ),
       time_unit = "date"
-    )
+    ))
     rm(offense)
     gc()
 
@@ -51,22 +51,22 @@ get_agg_data <- function(years) {
       offender_files[grep(year_temp, offender_files)],
       offense_small
     )
-    offender_agg_year <- aggregate_data(offender,
+    offender_agg_year <- suppressWarnings(aggregate_data(offender,
       variables = c(
         "sex_of_offender",
         "race_of_offender",
         "age_category"
       ),
       time_unit = "year"
-    )
-    offender_agg_month <- aggregate_data(offender,
+    ))
+    offender_agg_month <- suppressWarnings(aggregate_data(offender,
       variables = c(
         "sex_of_offender",
         "race_of_offender",
         "age_category"
       ),
       time_unit = "date"
-    )
+    ))
     rm(offender)
     gc()
 
@@ -75,7 +75,7 @@ get_agg_data <- function(years) {
       arrestee_group_b_files[grep(year_temp, arrestee_group_b_files)]
     ) %>%
       filter(ori %in% offense_small$ori)
-    arrestee_agg_year <- aggregate_data(arrestee,
+    arrestee_agg_year <- suppressWarnings(aggregate_data(arrestee,
       variables = c(
         "sex_of_arrestee",
         "race_of_arrestee",
@@ -84,8 +84,8 @@ get_agg_data <- function(years) {
         "type_of_arrest"
       ),
       time_unit = "year"
-    )
-    arrestee_agg_month <- aggregate_data(arrestee,
+    ))
+    arrestee_agg_month <- suppressWarnings(aggregate_data(arrestee,
       variables = c(
         "sex_of_arrestee",
         "race_of_arrestee",
@@ -94,13 +94,13 @@ get_agg_data <- function(years) {
         "type_of_arrest"
       ),
       time_unit = "date"
-    )
+    ))
     rm(arrestee)
     gc()
 
     victim <- prep_victim(victim_files[grep(year_temp, victim_files)]) %>%
       filter(ori %in% offense_small$ori)
-    victim_agg_year <- aggregate_data(victim,
+    victim_agg_year <- suppressWarnings(aggregate_data(victim,
       variables = c(
         "sex_of_victim",
         "race_of_victim",
@@ -111,8 +111,8 @@ get_agg_data <- function(years) {
       ),
       time_unit = "year",
       victim_type = TRUE
-    )
-    victim_agg_month <- aggregate_data(victim,
+    ))
+    victim_agg_month <- suppressWarnings(aggregate_data(victim,
       variables = c(
         "sex_of_victim",
         "race_of_victim",
@@ -123,7 +123,7 @@ get_agg_data <- function(years) {
       ),
       time_unit = "date",
       victim_type = TRUE
-    )
+    ))
 
     rm(victim)
     gc()
@@ -148,7 +148,7 @@ get_agg_data <- function(years) {
       left_join(victim_agg_month, by = c("ori", "time_unit"))
     saveRDS(
       temp_agg_month,
-      paste0("E:Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_", year_temp, ".rds")
+      paste0("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_", year_temp, ".rds")
     )
 
     message(year_temp)
@@ -220,7 +220,7 @@ state_abb <- unique(substr(unique(final_agg_year$ORI), 1, 2))
 state_abb <- sort(state_abb)
 state_abb
 
-rm(final_agg_year)
+
 gc()
 
 state_abb_first_half <- state_abb[1:25]

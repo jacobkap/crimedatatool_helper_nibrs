@@ -1,4 +1,4 @@
-setwd("D:/ucr_data_storage/clean_data/nibrs")
+setwd("F:/ucr_data_storage/clean_data/nibrs")
 library(lubridate)
 library(stringr)
 library(fastDummies)
@@ -133,7 +133,7 @@ subtype_sell_create_assist <- c("cultivating/manufacturing/publishing",
 
 
 combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
-  setwd("C:/Users/jkkap/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
+  setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/")
   files <- list.files(pattern = paste0("temp_agg_", type))
   if (type %in% c("year", "month")) {
     files <- files[-grep("property", files)]
@@ -189,7 +189,7 @@ combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
 
 
 get_batch_header <- function() {
-  setwd("D:/ucr_data_storage/clean_data/nibrs")
+  setwd("F:/ucr_data_storage/clean_data/nibrs")
   admin_files    <- list.files(pattern = "admin.*rds$")
   batch_header_files <- list.files(pattern = "batch.*rds")
   batch_header <- data.frame()
@@ -223,7 +223,7 @@ get_batch_header <- function() {
     left_join(batch_header)
 
 
-  ucr <- readRDS("D:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2021.rds") %>%
+  ucr <- readRDS("F:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2022.rds") %>%
     select(ORI = ori9,
            agency = crosswalk_agency_name) %>%
     distinct(ORI, .keep_all = TRUE)
