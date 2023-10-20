@@ -557,40 +557,40 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
     data <- data[-grep("30A|61A|90K", data$offense, ignore.case = TRUE), ]
   }
 
-  weapon_crimes <- c("aggravated assault",
+  weapon_crimes <- c("assault offenses - aggravated assault",
                      "extortion/blackmail",
-                     "fondling (incident liberties/child molest)",
+                     "sex offenses - fondling (incident liberties/child molest)",
                      "human trafficking - commercial sex acts",
                      "human trafficking - involuntary servitude",
                      "justifiable homicide",
                      "kidnapping/abduction",
                      "murder/nonnegligent manslaughter",
                      "negligent manslaughter",
-                     "rape",
+                     "sex offenses - rape",
                      "robbery",
-                     "sexual assault with an object",
-                     "sodomy",
-                     "weapon law violations")
-  injury_crimes <- c("aggravated assault",
+                     "sex offenses - sexual assault with an object",
+                     "sex offenses - sodomy",
+                     "weapon law violations - weapon law violations")
+  injury_crimes <- c("assault offenses - aggravated assault",
                      "extortion/blackmail",
-                     "fondling (incident liberties/child molest)",
+                     "sex offenses - fondling (incident liberties/child molest)",
                      "human trafficking - commercial sex acts",
                      "human trafficking - involuntary servitude",
                      "kidnapping/abduction",
-                     "rape",
+                     "sex offenses - rape",
                      "robbery",
-                     "sexual assault with an object",
-                     "simple assault",
-                     "sodomy")
+                     "sex offenses - sexual assault with an object",
+                     "assault offenses - simple assault",
+                     "sex offenses - sodomy")
   person_victim_types <- c("individual",
                            "law enforcement officer")
   crimes_with_subtypes <- c("animal cruelty",
                             "counterfeiting/forgery",
-                            "drug equipment violations",
-                            "drug/narcotic violations",
-                            "gambling equipment violations",
+                            "drug/narcotic offenses - drug equipment violations",
+                            "drug/narcotic offenses - drug/narcotic violations",
+                            "gambling offenses - gambling equipment violations",
                             "stolen property offenses (receiving, selling, etc.)",
-                            "weapon law violations")
+                            "weapon law violations - weapon law violations")
 
   data$time_unit <- data[, time_unit]
   cols_temp <- c("ori",
