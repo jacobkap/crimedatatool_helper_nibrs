@@ -1,4 +1,4 @@
-source("E:/Dropbox/R_project/crimedatatool_helper_nibrs/R/utils.R")
+source("~/crimedatatool_helper_nibrs/R/utils.R")
 library(blscrapeR)
 # https://www.usinflationcalculator.com/
 # inflation <- inflation_adjust(2022) %>%
@@ -28,17 +28,12 @@ cf$year <- year(cf$year)
 inflation <- cf
 inflation$multiplier <- inflation$inflation_adjuster
 
-
-
-repeated_numbers <- c()
-for (i in 1:9) {
-  for (n in 5:9) {
-    repeated_numbers <- c(repeated_numbers, strrep(i, n))
-  }
-}
-repeated_numbers <- c(repeated_numbers, 12345, 123456, 1234567, 12345678, 123456789, 999999998, 999999996)
-
-batch_header <- get_batch_header()
+batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
+  filter(number_of_months_reported %in% 12) %>%
+  select(ORI = ori,
+         year,
+         state,
+         population)
 batch_header$agency <- gsub(":", "-", batch_header$agency)
 sort(unique(batch_header$state))
 head(batch_header)
@@ -69,8 +64,6 @@ for (i in 1:length(property_files)) {
     left_join(inflation, by = "year")
   data$value[data$value %in% "unknown"] <- NA
   data$value <- parse_number(data$value)
-  data$value[data$value %in% repeated_numbers] <- NA
-  data$value[data$value >= 100000000] <- NA
 
   # Adjusted to 2022 cumulative inflation
   data$value <- data$value * data$multiplier
@@ -86,11 +79,11 @@ for (i in 1:length(property_files)) {
 
   saveRDS(
     data_agg_yearly,
-    paste0("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_year_nibrs_property_", year_temp, ".rds")
+    paste0("~/crimedatatool_helper_nibrs/data/temp_agg_year_nibrs_property_", year_temp, ".rds")
   )
   saveRDS(
     data_agg_monthly,
-    paste0("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/temp_agg_month_nibrs_property_", year_temp, ".rds")
+    paste0("~/crimedatatool_helper_nibrs/data/temp_agg_month_nibrs_property_", year_temp, ".rds")
   )
 
 
@@ -151,14 +144,14 @@ names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_mont
 gc()
 Sys.sleep(5)
 
-setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property")
+setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
 make_agency_csvs(final_data_agg_yearly)
 make_largest_agency_json(final_data_agg_yearly)
 make_state_agency_choices(final_data_agg_yearly)
 files <- list.files(pattern = "agency_choices")
 files
-file.copy(files, "E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
-setwd("E:/Dropbox/R_project/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
+file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
+setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
 make_agency_csvs(final_data_agg_monthly, type = "month")
 
 get_property_agg <- function(data, time_unit) {
