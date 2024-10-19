@@ -1,158 +1,83 @@
 source("~/crimedatatool_helper_nibrs/R/utils.R")
-library(blscrapeR)
-# https://www.usinflationcalculator.com/
-# inflation <- inflation_adjust(2022) %>%
-#   select(
-#     year,
-#     pct_increase
-#   )
-# inflation$multiplier <- inflation$pct_increase / 100
-# inflation$multiplier <- abs(inflation$multiplier)
-# inflation$multiplier <- 1 - inflation$multiplier
-# inflation$multiplier <- 1 / inflation$multiplier
-# inflation$year <- as.numeric(inflation$year)
-# inflation$pct_increase <- NULL
-# 999999999 999999998
-library(quantmod)
-# https://stackoverflow.com/questions/12590180/inflation-adjusted-prices-package
-inflation <- getSymbols("CPIAUCSL", src='FRED')
-avg.cpi <- apply.yearly(CPIAUCSL, mean)
-cf <- avg.cpi/as.numeric(avg.cpi['2022']) #using 2022 as the base year
-cf <- as.data.frame(cf)
-cf$year <- rownames(cf)
-rownames(cf) <- 1:nrow(cf)
-cf <-
-  cf %>%
-  rename(inflation_adjuster = CPIAUCSL)
-cf$year <- year(cf$year)
-inflation <- cf
-inflation$multiplier <- inflation$inflation_adjuster
-
-batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
-  filter(number_of_months_reported %in% 12) %>%
-  select(ORI = ori,
-         year,
-         state,
-         population)
-batch_header$agency <- gsub(":", "-", batch_header$agency)
-sort(unique(batch_header$state))
-head(batch_header)
-
-property_files <- list.files(pattern = "nibrs_property.*rds$")
-property_files
 
 
-for (i in 1:length(property_files)) {
-  year_temp <- parse_number(property_files[i])
 
-  data <- readRDS(property_files[i]) %>%
+get_property_years <- function(years) {
+
+  inflation_adjust <- data.frame(year = 1991:2023, price = 1)
+  inflation_adjust$in_current_dollars <- adjust_for_inflation(inflation_adjust$price,
+                                                              inflation_adjust$year,
+                                                              "US",
+                                                              to_date = 2023)
+  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
     select(ori,
-      date = incident_date,
-      type_of_property_loss,
-      value = value_of_property,
-      property_description,
-      suspected_drug_type_1,
-      suspected_drug_type_2,
-      suspected_drug_type_3
-    ) %>%
-    filter(!type_of_property_loss %in% c("unknown", "none")) %>%
-    mutate(
-      date = ymd(date),
-      year = year(date),
-      month = floor_date(date, unit = "month")
-    ) %>%
-    left_join(inflation, by = "year")
-  data$value[data$value %in% "unknown"] <- NA
-  data$value <- parse_number(data$value)
+           number_of_months_reported,
+           year)
 
-  # Adjusted to 2022 cumulative inflation
-  data$value <- data$value * data$multiplier
-
-  data$type_of_property_loss[data$type_of_property_loss %in% "stolen/etc. (includes bribed, defrauded, embezzled, extorted, ransomed, robbed, etc.)"] <- "stolen"
-  data$type_of_property_loss[data$type_of_property_loss %in% "destroyed/damaged/vandalized"] <- "destroyed"
-  data$type_of_property_loss[data$type_of_property_loss %in% "counterfeited/forged"] <- "counterfeited"
-
-  data_agg_yearly <- get_property_agg(data, "year")
-  data_agg_monthly <- get_property_agg(data, "month")
-  rm(data)
-  gc()
-
-  saveRDS(
-    data_agg_yearly,
-    paste0("~/crimedatatool_helper_nibrs/data/temp_agg_year_nibrs_property_", year_temp, ".rds")
-  )
-  saveRDS(
-    data_agg_monthly,
-    paste0("~/crimedatatool_helper_nibrs/data/temp_agg_month_nibrs_property_", year_temp, ".rds")
-  )
+  for (i in 1:length(years)) {
 
 
-  # final_data_agg_yearly  <- bind_rows(final_data_agg_yearly, data_agg_yearly)
-  # final_data_agg_monthly <- bind_rows(final_data_agg_monthly, data_agg_monthly)
+    setwd("F:/ucr_data_storage/clean_data/nibrs")
+    property_files <- list.files(pattern = "nibrs_property.*rds$", full.names = TRUE)
+    property_files
+    year_temp <- years[i]
+    file <- property_files[grep(year_temp, property_files)]
 
-  rm(data_agg_yearly)
-  rm(data_agg_monthly)
-  gc()
-  Sys.sleep(3)
+    data <- readRDS(file) %>%
+      select(ori,
+             unique_incident_id,
+             date = incident_date,
+             type_of_property_loss,
+             value = value_of_property,
+             property_description,
+             suspected_drug_type_1,
+             suspected_drug_type_2,
+             suspected_drug_type_3
+      ) %>%
+      filter(!type_of_property_loss %in% c("unknown", "none")) %>%
+      mutate(
+        date = ymd(date),
+        year = year(date),
+        month = floor_date(date, unit = "month")
+      ) %>%
+      left_join(inflation_adjust, by = "year") %>%
+      left_join(batch_header, by = join_by(ori, year)) %>%
+      filter(number_of_months_reported %in% 12) %>%
+      select(-number_of_months_reported)
+    data$value[data$value %in% "unknown"] <- NA
+    data$value <- parse_number(data$value)
+
+    # Adjusted to 2022 cumulative inflation
+    data$value <- data$value * data$in_current_dollars
+    data$in_current_dollars <- NULL
+
+    data$type_of_property_loss[data$type_of_property_loss %in% "stolen (includes bribed, defrauded, embezzled, extorted, ransomed, robbed, etc.)"] <- "stolen"
+    data$type_of_property_loss[data$type_of_property_loss %in% "destroyed/damaged/vandalized"] <- "destroyed"
+    data$type_of_property_loss[data$type_of_property_loss %in% "counterfeited/forged"] <- "counterfeited"
+
+    data_agg_yearly <- get_property_agg(data, time_unit = "year")
+    data_agg_monthly <- get_property_agg(data, time_unit = "month")
+    rm(data)
+    gc()
+
+    data_agg_yearly$unique_incident_id <- NULL
+    saveRDS(
+      data_agg_yearly,
+      paste0("~/crimedatatool_helper_nibrs/data/agg_data_property/temp_agg_year_nibrs_property_", year_temp, ".rds")
+    )
+    saveRDS(
+      data_agg_monthly,
+      paste0("~/crimedatatool_helper_nibrs/data/agg_data_property/temp_agg_month_nibrs_property_", year_temp, ".rds")
+    )
 
 
-  # final_data_agg_yearly[is.na(final_data_agg_yearly)]   <- 0
-  # final_data_agg_monthly[is.na(final_data_agg_monthly)] <- 0
-  message(property_files[i])
+    rm(data_agg_yearly, data_agg_monthly)
+    gc(); Sys.sleep(1); gc()
+
+    message(years[i])
+  }
 }
 
-final_data_agg_yearly <- combine_agg_data(type = "year_nibrs_property_", batch_header)
-final_data_agg_monthly <- combine_agg_data(type = "month_nibrs_property_", batch_header)
-gc()
-Sys.sleep(3)
-
-final_data_agg_monthly <-
-  final_data_agg_monthly %>%
-  mutate(
-    month = year,
-    year = year(year)
-  ) %>%
-  left_join(batch_header) %>%
-  select(-year) %>%
-  mutate(year = month) %>%
-  select(
-    ORI,
-    year,
-    month,
-    agency,
-    state,
-    population,
-    everything()
-  )
-
-
-final_data_agg_yearly <-
-  final_data_agg_yearly %>%
-  left_join(batch_header) %>%
-  select(
-    ORI,
-    year,
-    agency,
-    state,
-    population,
-    everything()
-  )
-
-names(final_data_agg_yearly) <- gsub("property_", "", names(final_data_agg_yearly))
-names(final_data_agg_yearly)
-names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
-gc()
-Sys.sleep(5)
-
-setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
-make_agency_csvs(final_data_agg_yearly)
-make_largest_agency_json(final_data_agg_yearly)
-make_state_agency_choices(final_data_agg_yearly)
-files <- list.files(pattern = "agency_choices")
-files
-file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
-setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
-make_agency_csvs(final_data_agg_monthly, type = "month")
 
 get_property_agg <- function(data, time_unit) {
   main_agg <- data.frame()
@@ -208,27 +133,36 @@ get_property_agg <- function(data, time_unit) {
   data_drugs1 <-
     data %>%
     select(ori,
-      time_unit,
-      drug = suspected_drug_type_1
+           unique_incident_id,
+           time_unit,
+           drug = suspected_drug_type_1
     )
   data_drugs2 <-
     data %>%
     select(ori,
-      time_unit,
-      drug = suspected_drug_type_2
+           unique_incident_id,
+           time_unit,
+           drug = suspected_drug_type_2
     )
   data_drugs3 <-
     data %>%
     select(ori,
-      time_unit,
-      drug = suspected_drug_type_3
+           unique_incident_id,
+           time_unit,
+           drug = suspected_drug_type_3
     )
 
   data_drugs <-
     data_drugs1 %>%
     bind_rows(data_drugs2) %>%
     bind_rows(data_drugs3) %>%
-    filter(drug != "over 3 drug types")
+    filter(!drug %in% "over 3 drug types",
+           !drug %in% "other drugs: antidepressants (elavil, triavil, tofranil, etc.), aromatic hydrocarbons, propoxyphene or darvon, tranquilizers (chlordiazepoxide or librium, diazepam or valium, etc.), etc.") %>%
+    distinct(ori,
+             unique_incident_id,
+             drug,
+             .keep_all = TRUE)
+  data_drugs$unique_incident_id <- NULL
   data_drugs$drug <- gsub(":.*| \\(.*", "", data_drugs$drug)
 
   drugs_agg <-
@@ -247,7 +181,6 @@ get_property_agg <- function(data, time_unit) {
     main_agg %>%
     left_join(drugs_agg, by = c("ori", "time_unit"))
 
-  # names(main_agg) <- gsub("^time_unit$", "year", names(main_agg))
   if (time_unit %in% "month") {
     main_year <- names(sort(table(year(main_agg$time_unit)), decreasing = TRUE)[1])
     main_agg <- main_agg %>% filter(year(time_unit) %in% main_year)
@@ -262,9 +195,66 @@ get_property_agg <- function(data, time_unit) {
     rename_all(make_clean_names)
 
   main_agg <- dummy_rows(main_agg,
-    select_columns = c("ori", "time_unit"),
-    dummy_value = NA
+                         select_columns = c("ori", "time_unit"),
+                         dummy_value = NA
   )
   main_agg[is.na(main_agg)] <- 0
   return(main_agg)
 }
+
+
+
+get_property_years(1991:2023)
+
+final_data_agg_yearly <- combine_agg_data(type = "year_nibrs_property_", batch_header)
+final_data_agg_monthly <- combine_agg_data(type = "month_nibrs_property_", batch_header)
+gc()
+Sys.sleep(3)
+
+final_data_agg_monthly <-
+  final_data_agg_monthly %>%
+  mutate(
+    month = year,
+    year = year(year)
+  ) %>%
+  left_join(batch_header) %>%
+  select(-year) %>%
+  mutate(year = month) %>%
+  select(
+    ORI,
+    year,
+    month,
+    agency,
+    state,
+    population,
+    everything()
+  )
+
+
+final_data_agg_yearly <-
+  final_data_agg_yearly %>%
+  left_join(batch_header) %>%
+  select(
+    ORI,
+    year,
+    agency,
+    state,
+    population,
+    everything()
+  )
+
+names(final_data_agg_yearly) <- gsub("property_", "", names(final_data_agg_yearly))
+names(final_data_agg_yearly)
+names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
+gc()
+Sys.sleep(5)
+
+setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
+make_agency_csvs(final_data_agg_yearly)
+make_largest_agency_json(final_data_agg_yearly)
+make_state_agency_choices(final_data_agg_yearly)
+files <- list.files(pattern = "agency_choices")
+files
+file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
+setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
+make_agency_csvs(final_data_agg_monthly, type = "month")

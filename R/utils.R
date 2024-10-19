@@ -9,7 +9,8 @@ packages <- c(
   "crimeutils",
   "here",
   "parallel",
-  "readr"
+  "readr",
+  "priceR"
 )
 
 library(groundhog)
@@ -234,64 +235,7 @@ combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
 }
 
 
-get_batch_header <- function() {
-  setwd("F:/ucr_data_storage/clean_data/nibrs")
-  admin_files <- list.files(pattern = "admin.*rds$")
-  batch_header_files <- list.files(pattern = "batch.*rds")
-  batch_header <- data.frame()
-  for (file in batch_header_files) {
-    temp <- readRDS(file) %>%
-      select(
-        ORI = ori,
-        year,
-        state,
-        population
-      )
-    message(file)
-    batch_header <- bind_rows(batch_header, temp)
-  }
 
-  months_reported <- data.frame()
-  for (file in admin_files) {
-    temp <- readRDS(file) %>%
-      mutate(month = floor_date(ymd(incident_date), unit = "month")) %>%
-      filter(year(month) %in% unique(year)) %>%
-      distinct(ori, year, month, .keep_all = TRUE) %>%
-      count(ori, year) %>%
-      rename(number_of_months_reported = n) %>%
-      filter(number_of_months_reported %in% 12) %>%
-      select(-number_of_months_reported)
-    message(file)
-    gc()
-    months_reported <- bind_rows(months_reported, temp)
-  }
-
-  batch_header <- months_reported %>%
-    rename(ORI = ori) %>%
-    left_join(batch_header)
-
-
-  ucr <- readRDS("F:/ucr_data_storage/clean_data/offenses_known/offenses_known_yearly_1960_2023.rds") %>%
-    select(
-      ORI = ori9,
-      agency = crosswalk_agency_name
-    ) %>%
-    distinct(ORI, .keep_all = TRUE) %>%
-    filter(!is.na(ORI))
-
-  batch_header <- batch_header %>%
-    left_join(ucr) %>%
-    filter(!is.na(agency)) %>%
-    mutate(agency = capitalize_words(agency)) %>%
-    filter(
-      !is.na(agency),
-      !is.na(state),
-      !is.na(ORI)
-    )
-  batch_header$state <- gsub(" V2", "", batch_header$state)
-  gc()
-  return(batch_header)
-}
 
 
 

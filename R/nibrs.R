@@ -266,7 +266,7 @@ injury_offenses <- c("assault_offenses_aggravated_assault",
                      "sex_offenses_sexual_assault_with_an_object",
                      "sex_offenses_sodomy")
 
-subtype_offenses2 <- make_clean_names(sort(unique(offense_data$ucr_offense_code[offense_data$type_criminal_activity_1 %in%
+subtype_offenses <- make_clean_names(sort(unique(offense_data$ucr_offense_code[offense_data$type_criminal_activity_1 %in%
                                                                                  c(c(subtype_buy_possess_consume,
                                                                                      subtype_sell_create_assist))])))
 
