@@ -204,57 +204,27 @@ get_property_agg <- function(data, time_unit) {
 
 
 
-get_property_years(1991:2023)
+#get_property_years(2020:2023)
 
-final_data_agg_yearly <- combine_agg_data(type = "year_nibrs_property_", batch_header)
-final_data_agg_monthly <- combine_agg_data(type = "month_nibrs_property_", batch_header)
+
+yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "year", full.names = TRUE)
+monthly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "month", full.names = TRUE)
+yearly_files
+monthly_files
+
+#yearly_data <- vector("list", length = length(yearly_files))
+monthly_data <- vector("list", length = length(monthly_files))
+for (i in 1:length(yearly_files)) {
+ # yearly_data[[i]] <- readRDS(yearly_files[i])
+  monthly_data[[i]] <- readRDS(monthly_files[i])
+  message(i)
+}
+#yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)
+monthly_data <- data.table::rbindlist(monthly_data, fill = TRUE)
 gc()
-Sys.sleep(3)
-
-final_data_agg_monthly <-
-  final_data_agg_monthly %>%
-  mutate(
-    month = year,
-    year = year(year)
-  ) %>%
-  left_join(batch_header) %>%
-  select(-year) %>%
-  mutate(year = month) %>%
-  select(
-    ORI,
-    year,
-    month,
-    agency,
-    state,
-    population,
-    everything()
-  )
 
 
-final_data_agg_yearly <-
-  final_data_agg_yearly %>%
-  left_join(batch_header) %>%
-  select(
-    ORI,
-    year,
-    agency,
-    state,
-    population,
-    everything()
-  )
-
-names(final_data_agg_yearly) <- gsub("property_", "", names(final_data_agg_yearly))
-names(final_data_agg_yearly)
-names(final_data_agg_monthly) <- gsub("property_", "", names(final_data_agg_monthly))
-gc()
-Sys.sleep(5)
-
-setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
-make_agency_csvs(final_data_agg_yearly)
-make_largest_agency_json(final_data_agg_yearly)
-make_state_agency_choices(final_data_agg_yearly)
-files <- list.files(pattern = "agency_choices")
-files
-file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
-setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
-make_agency_csvs(final_data_agg_monthly, type = "month")
+#save_as_csv_for_site(yearly_data, type = "year", property = TRUE)
+#rm(yearly_data); gc(); Sys.sleep(1); gc()
+save_as_csv_for_site(monthly_data, type = "month", property = TRUE)
+rm(monthly_data); gc(); Sys.sleep(1); gc()

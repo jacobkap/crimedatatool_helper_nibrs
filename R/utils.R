@@ -10,7 +10,8 @@ packages <- c(
   "here",
   "parallel",
   "readr",
-  "priceR"
+  "priceR",
+  "progress"
 )
 
 library(groundhog)
@@ -18,6 +19,100 @@ groundhog.library(packages, "2024-10-01")
 
 setwd("F:/ucr_data_storage/clean_data/nibrs")
 
+
+remove_duplicate_capitalize_names <- function(data) {
+  same_name_agencies <-
+    data %>%
+    distinct(ORI, .keep_all = TRUE) %>%
+    mutate(temp = paste(agency, state))
+  same_name_agencies_name <-
+    same_name_agencies %>%
+    count(temp) %>%
+    filter(n > 1)
+  same_name_agencies_ori <-
+    same_name_agencies %>%
+    filter(temp %in% same_name_agencies_name$temp)
+  print(summary(data$population[data$ORI %in% same_name_agencies_ori$ORI]))
+  data <-
+    data %>%
+    filter(!ORI %in% same_name_agencies_ori$ORI) %>%
+    mutate(
+      agency = tolower(agency),
+      agency = gsub("dept\\.|dept|dep |dep$", "department", agency),
+      agency = gsub("^st ", "state", agency),
+      agency = gsub(" hdq ", " headquarters ", agency),
+      agency = gsub("sp:", "state police:", agency),
+      agency = gsub("pd", "police", agency),
+      agency = gsub(" univ ", " university ", agency),
+      agency = gsub(" co$| co ", " county", agency),
+      agency = gsub(" offi$", " office", agency),
+      agency = gsub("twp", "township", agency),
+      agency = gsub("div ", "division ", agency),
+      agency = gsub("ptrl:", "patrol:", agency),
+      agency = gsub("bf:", "bureau of forestry:", agency),
+      agency = gsub("hp:", "highway patrol:", agency),
+      agency = gsub("chp ", "california highway patrol:", agency),
+      agency = gsub("bn:", "office of attorney general region:", agency),
+      agency = gsub("dle:", "division of law enforcement:", agency),
+      agency = gsub("enf:|enf ", "enforcement", agency),
+      agency = gsub("law enf div dept natrl resources", "department of natural resources", agency),
+      agency = gsub("fl ", "florida", agency),
+      agency = gsub("dnr:", "department of natural resources:", agency),
+      agency = gsub("co crim law enf", "county criminal law enforcement", agency),
+      agency = gsub("uppr:", "union pacific railroad:", agency),
+      agency = str_to_title(agency),
+      state = str_to_title(state),
+      agency = gsub("U S ", "US ", agency),
+      agency = gsub("^Us ", "US ", agency, ignore.case = TRUE),
+      agency = gsub(" Atf ", " ATF ", agency),
+      agency = gsub("Fbi,", "FBI,", agency),
+      agency = gsub("Dea,", "DEA,", agency),
+      agency = gsub("Doi:", " DOI:", agency),
+      state = gsub(" Of ", " of ", state),
+      agency = trimws(agency),
+      state = trimws(state)
+    )
+
+  gc()
+  return(data)
+}
+
+keep_most_common_agency_name <- function(data) {
+  temp <-
+    data %>%
+    distinct(
+      ori,
+      agency_name
+    ) %>%
+    count(ori) %>%
+    filter(n > 1)
+  temp <-
+    data %>%
+    filter(ori %in% temp$ori)
+  new_names <- data.frame(
+    ori = unique(temp$ori),
+    new_name = NA
+  )
+  pb <- progress_bar$new(
+    format = " [:bar] :percent eta: :eta",
+    total = nrow(new_names), clear = FALSE, width = 60
+  )
+  for (i in 1:nrow(new_names)) {
+    temp_ori <-
+      temp %>%
+      filter(ori %in% new_names$ori[i]) %>%
+      count(agency_name) %>%
+      arrange(desc(n))
+    new_names$new_name[i] <- temp_ori$agency_name[1]
+    pb$tick()
+  }
+  data <-
+    data %>%
+    left_join(new_names)
+  data$agency_name[!is.na(data$new_name)] <- data$new_name[!is.na(data$new_name)]
+  data$new_name <- NULL
+  return(data)
+}
 
 age_fix <- c(
   "over 98 years old" = "99",
@@ -310,30 +405,30 @@ prep_offense <- function(file, batch_header) {
 
   # Top code drug subtype
   data$subtype <- NA
-  data$subtype[data$type_criminal_activity_1 %in% "subtype_buy_possess_consume" |
-    data$type_criminal_activity_2 %in% "subtype_buy_possess_consume" |
-    data$type_criminal_activity_3 %in% "subtype_buy_possess_consume"] <- "buy_possess_consume"
-  data$subtype[data$type_criminal_activity_1 %in% "subtype_sell_create_assist" |
-    data$type_criminal_activity_2 %in% "subtype_sell_create_assist" |
-    data$type_criminal_activity_3 %in% "subtype_sell_create_assist"] <- "sell_create_assist"
+  data$subtype[data$type_criminal_activity_1 %in% subtype_buy_possess_consume |
+    data$type_criminal_activity_2 %in% subtype_buy_possess_consume |
+    data$type_criminal_activity_3 %in% subtype_buy_possess_consume] <- "buy_possess_consume"
+  data$subtype[data$type_criminal_activity_1 %in% subtype_sell_create_assist |
+    data$type_criminal_activity_2 %in% subtype_sell_create_assist |
+    data$type_criminal_activity_3 %in% subtype_sell_create_assist] <- "sell_create_assist"
 
   # Now top-code animal abuse
   neglect_subtype <- "simple/gross neglect (unintentionally, intentionally, or knowingly failing to provide food, water, shelter, veterinary care, hoarding, etc.)"
   torture_subtype <- "intentional abuse and torture (tormenting, mutilating, poisoning, or abandonment)"
   animal_fighting_subtype <- "organized abuse (dog fighting and cock fighting)"
   bestiality_subtype <- "animal sexual abuse (bestiality)"
-  data$subtype[data$type_criminal_activity_1 %in% "neglect_subtype" |
-    data$type_criminal_activity_2 %in% "neglect_subtype" |
-    data$type_criminal_activity_3 %in% "neglect_subtype"] <- "neglect"
-  data$subtype[data$type_criminal_activity_1 %in% "torture_subtype" |
-    data$type_criminal_activity_2 %in% "torture_subtype" |
-    data$type_criminal_activity_3 %in% "torture_subtype"] <- "abuse/torture"
-  data$subtype[data$type_criminal_activity_1 %in% "animal_fighting_subtype" |
-    data$type_criminal_activity_2 %in% "animal_fighting_subtype" |
-    data$type_criminal_activity_3 %in% "animal_fighting_subtype"] <- "animal fighting"
-  data$subtype[data$type_criminal_activity_1 %in% "bestiality_subtype" |
-    data$type_criminal_activity_2 %in% "bestiality_subtype" |
-    data$type_criminal_activity_3 %in% "bestiality_subtype"] <- "bestiality"
+  data$subtype[data$type_criminal_activity_1 %in% neglect_subtype |
+    data$type_criminal_activity_2 %in% neglect_subtype |
+    data$type_criminal_activity_3 %in% neglect_subtype] <- "neglect"
+  data$subtype[data$type_criminal_activity_1 %in% torture_subtype |
+    data$type_criminal_activity_2 %in% torture_subtype |
+    data$type_criminal_activity_3 %in% torture_subtype] <- "abuse/torture"
+  data$subtype[data$type_criminal_activity_1 %in% animal_fighting_subtype |
+    data$type_criminal_activity_2 %in% animal_fighting_subtype |
+    data$type_criminal_activity_3 %in% animal_fighting_subtype] <- "animal fighting"
+  data$subtype[data$type_criminal_activity_1 %in% bestiality_subtype |
+    data$type_criminal_activity_2 %in% bestiality_subtype |
+    data$type_criminal_activity_3 %in% bestiality_subtype] <- "bestiality"
 
 
   data$location <- NA
@@ -456,12 +551,12 @@ prep_victim <- function(file, batch_header) {
   }
   data <-
     data %>%
+    rename(offense = ucr_offense_code_1) %>%
     bind_rows(final)
 
   data <-
     data %>%
     select(
-      -ucr_offense_code_1,
       -ucr_offense_code_2,
       -ucr_offense_code_3,
       -ucr_offense_code_4,
@@ -809,7 +904,135 @@ make_agency_csvs <- function(data,
     make_csv_test,
     type = type
   )
+
 }
+
+save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
+  crosswalk <- read_csv("~/crimedatatool_helper_nibrs/data/crosswalk.csv") %>%
+    select(-ori,
+           -population,
+           -fips_state_county_code,
+           -census_name) %>%
+    select(
+      ORI = ori9,
+      agency_name = crosswalk_agency_name)
+  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
+    select(
+      ORI = ori,
+      city_name,
+      year,
+      state,
+      population
+    ) %>%
+    left_join(crosswalk)
+  batch_header$state <- gsub("V2", "", batch_header$state)
+  batch_header$state <- trimws(batch_header$state)
+  sort(unique(batch_header$state))
+  batch_header$agency_name[is.na(batch_header$agency)] <- batch_header$city_name[is.na(batch_header$agency_name)]
+  batch_header$city_name <- NULL
+
+  batch_header <- keep_most_common_agency_name(batch_header %>%
+                                                 rename(ori = ORI)) %>%
+    rename(ORI = ori,
+           agency = agency_name)
+
+
+
+  names(data) <- gsub(
+    "^victim_refused_to_cooperate", "offense_victim_refused_to_cooperate",
+    names(data)
+  )
+  names(data) <- gsub(
+    "^prosecution_declined", "offense_prosecution_declined",
+    names(data)
+  )
+  names(data) <- gsub(
+    "^death_of_suspect", "offense_death_of_suspect",
+    names(data)
+  )
+  names(data) <- gsub(
+    "^extradition_denied", "offense_extradition_denied",
+    names(data)
+  )
+  names(data) <- gsub(
+    "^juvenile_no_custody", "offense_juvenile_no_custody",
+    names(data)
+  )
+  names(data) <- gsub(
+    "^cleared_by_arrest", "offense_cleared_by_arrest",
+    names(data)
+  )
+
+  if (type %in% "month") {
+    data$year <- year(data$time_unit)
+  } else {
+    data$year <- data$time_unit
+  }
+
+  data <-
+    data %>%
+    rename(ORI = ori) %>%
+    left_join(batch_header) %>%
+    filter(!state %in% c("canal Zone",
+                         "Guam",
+                         "Puerto Rico",
+                         "virgin Islands")) %>%
+    remove_duplicate_capitalize_names()
+
+  if (type %in% "month") {
+    data <-
+      data %>%
+      select(-year) %>%
+      rename(year = time_unit)
+  }
+  data$time_unit <- NULL
+
+  data <-
+    data %>%
+    select(
+      ORI,
+      year,
+      agency,
+      state,
+      population,
+      everything()
+    ) %>%
+    filter(!is.na(agency))
+
+  if (property) {
+    if (type %in% "year") {
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
+      make_largest_agency_json(data)
+      make_state_agency_choices(data)
+      make_agency_csvs(data)
+    } else {
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
+      files <- list.files(pattern = "agency_choices")
+      files
+      file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
+
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
+      make_agency_csvs(data, type = "month")
+    }
+  } else {
+    if (type %in% "year") {
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs")
+      make_largest_agency_json(data)
+      make_state_agency_choices(data)
+      make_agency_csvs(data)
+    } else {
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs")
+      files <- list.files(pattern = "agency_choices")
+      files
+      file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
+
+      setwd("~/crimedatatool_helper_nibrs/data/nibrs_monthly")
+      make_agency_csvs(data, type = "month")
+    }
+  }
+}
+
+
 
 make_all_na <- function(col) {
   col <- NA
@@ -831,7 +1054,7 @@ make_csv_test <- function(temp, type) {
 
 dummy_rows_missing_years <- function(data, type) {
   data$year <- as.character(data$year)
-  if (type == "year") {
+  if (type %in% "year") {
     missing_years <- min(data$year):max(data$year)
   } else {
     missing_years <- seq.Date(lubridate::ymd(min(data$year)),
