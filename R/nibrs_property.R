@@ -212,19 +212,21 @@ monthly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property
 yearly_files
 monthly_files
 
-#yearly_data <- vector("list", length = length(yearly_files))
+yearly_data <- vector("list", length = length(yearly_files))
 monthly_data <- vector("list", length = length(monthly_files))
 for (i in 1:length(yearly_files)) {
- # yearly_data[[i]] <- readRDS(yearly_files[i])
+  yearly_data[[i]] <- readRDS(yearly_files[i])
   monthly_data[[i]] <- readRDS(monthly_files[i])
   message(i)
 }
-#yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)
+yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)
 monthly_data <- data.table::rbindlist(monthly_data, fill = TRUE)
 gc()
 
+names(yearly_data) <- gsub("property_", "", names(yearly_data))
+names(monthly_data) <- gsub("property_", "", names(monthly_data))
 
-#save_as_csv_for_site(yearly_data, type = "year", property = TRUE)
-#rm(yearly_data); gc(); Sys.sleep(1); gc()
+save_as_csv_for_site(yearly_data, type = "year", property = TRUE)
+rm(yearly_data); gc(); Sys.sleep(1); gc()
 save_as_csv_for_site(monthly_data, type = "month", property = TRUE)
 rm(monthly_data); gc(); Sys.sleep(1); gc()
