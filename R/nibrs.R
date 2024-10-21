@@ -269,6 +269,32 @@ add_missing_columns <- function(data) {
 
   offense_values <- make_clean_names(sort(unique(offense_data$ucr_offense_code)))
   offense_values[offense_values %in% make_clean_names(theft_crimes)] <- "theft"
+  offense_values <- c(offense_values,
+                      make_clean_names(c(
+                        "commerce violations - import violations",
+                        "commerce violations - export Violations",
+                        "commerce violations - federal liquor offenses",
+                        "commerce violations - federal tobacco offenses",
+                        "commerce violations - wildlife trafficking",
+                        "immigration violations - illegal entry into the united states",
+                        "immigration violations - false citizenship",
+                        "immigration violations - smuggling aliens",
+                        "immigration violations - re-entry into the united states after deportation",
+                        "fugitive offenses - harboring escapee - concealing from arrest",
+                        "fugitive offenses - flight to avoid prosecution",
+                        "fugitive offenses - flight to avoid deportation",
+                        "sex offenses - failure to register as a sex offender",
+                        "treason",
+                        "weapon law violations - violation of national firearm act of 1934",
+                        "weapon law violations - weapons of mass destruction",
+                        "weapon law violations - explosives",
+                        "bond default - failure to appear",
+                        "federal resource violations",
+                        "perjury",
+                        "fraud offenses - money laundering",
+                        "espionage"
+                      )))
+
   offense_values <- unique(offense_values)
   offense_values
   for (offense in offense_values) {
@@ -294,6 +320,7 @@ add_missing_columns <- function(data) {
       }
     }
   }
+  gc()
   return(data)
 }
 
@@ -318,6 +345,7 @@ gc()
 
 yearly_data <- add_missing_columns(yearly_data)
 monthly_data <- add_missing_columns(monthly_data)
+gc()
 
 save_as_csv_for_site(yearly_data, type = "year")
 rm(yearly_data); gc(); Sys.sleep(1); gc()
