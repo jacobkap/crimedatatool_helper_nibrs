@@ -295,6 +295,8 @@ add_missing_columns <- function(data) {
                         "espionage"
                       )))
 
+
+  rm(offense_data, victim_data)
   offense_values <- unique(offense_values)
   offense_values
   for (offense in offense_values) {
@@ -315,17 +317,15 @@ add_missing_columns <- function(data) {
     for (column in all_columns) {
       col_value <- paste0(column, offense)
       if (!col_value %in% names(data)) {
-        data[, col_value] <- 0
+        data [, (col_value ) := 0]
         message(paste0("Adding ", col_value))
+        gc()
       }
     }
   }
   gc()
   return(data)
 }
-
-
-
 
 # get_agg_data(1991:2023)
 
@@ -336,7 +336,7 @@ yearly_data <- vector("list", length = length(yearly_files))
 monthly_data <- vector("list", length = length(monthly_files))
 for (i in 1:length(yearly_files)) {
   yearly_data[[i]] <- readRDS(yearly_files[i])
-  monthly_data[[i]] <- readRDS(monthly_files[i])
+ monthly_data[[i]] <- readRDS(monthly_files[i])
   message(i)
 }
 yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)

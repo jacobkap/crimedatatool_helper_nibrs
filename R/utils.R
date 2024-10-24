@@ -343,14 +343,15 @@ prep_admin <- function(file) {
       cleared_exceptionally
     ) %>%
     mutate_if(is.character, tolower) %>%
-    distinct(unique_incident_id)
+    distinct(unique_incident_id,
+             .keep_all = TRUE)
 
   data$cleared <- "not cleared"
-  data$cleared[data$cleared_exceptionally %in% "victim refused to cooperate"] <- "victim refused to cooperate"
-  data$cleared[data$cleared_exceptionally %in% "prosecution declined (for other than lack of probable cause)"] <- "prosecution declined"
-  data$cleared[data$cleared_exceptionally %in% "death of offender"] <- "death of suspect"
+  data$cleared[data$cleared_exceptionally %in% "victim refused to cooperate (in the prosecution)"] <- "victim refused to cooperate"
+  data$cleared[data$cleared_exceptionally %in% "prosecution declined (by the prosecutor for other than lack of probable cause)"] <- "prosecution declined"
+  data$cleared[data$cleared_exceptionally %in% "death of suspect"] <- "death of suspect"
   data$cleared[data$cleared_exceptionally %in% "extradition denied"] <- "extradition denied"
-  data$cleared[data$cleared_exceptionally %in% "juvenile/no custody"] <- "juvenile/no custody"
+  data$cleared[data$cleared_exceptionally %in% "juvenile/no custody (the handling of a juvenile without taking him/her into custody, but rather by oral or written notice given to the parents or legal guardian in a case involving a minor offense, such as a petty larceny)"] <- "juvenile/no custody"
 
   data$cleared[data$total_arrestee_segments > 0] <- "cleared by arrest"
   data$total_arrestee_segments <- NULL
