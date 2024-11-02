@@ -349,7 +349,7 @@ prep_admin <- function(file) {
   data$cleared <- "not cleared"
   data$cleared[data$cleared_exceptionally %in% "victim refused to cooperate (in the prosecution)"] <- "victim refused to cooperate"
   data$cleared[data$cleared_exceptionally %in% "prosecution declined (by the prosecutor for other than lack of probable cause)"] <- "prosecution declined"
-  data$cleared[data$cleared_exceptionally %in% "death of suspect"] <- "death of suspect"
+  data$cleared[data$cleared_exceptionally %in% "death of offender"] <- "death of suspect"
   data$cleared[data$cleared_exceptionally %in% "extradition denied"] <- "extradition denied"
   data$cleared[data$cleared_exceptionally %in% "juvenile/no custody (the handling of a juvenile without taking him/her into custody, but rather by oral or written notice given to the parents or legal guardian in a case involving a minor offense, such as a petty larceny)"] <- "juvenile/no custody"
 
