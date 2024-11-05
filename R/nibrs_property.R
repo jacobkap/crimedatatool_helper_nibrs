@@ -1,22 +1,18 @@
-source("~/crimedatatool_helper_nibrs/R/utils.R")
-
-
-
 get_property_years <- function(years) {
-
   inflation_adjust <- data.frame(year = 1991:2023, price = 1)
   inflation_adjust$in_current_dollars <- adjust_for_inflation(inflation_adjust$price,
-                                                              inflation_adjust$year,
-                                                              "US",
-                                                              to_date = 2023)
+    inflation_adjust$year,
+    "US",
+    to_date = 2023
+  )
   batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
-    select(ori,
-           number_of_months_reported,
-           year)
+    select(
+      ori,
+      number_of_months_reported,
+      year
+    )
 
   for (i in 1:length(years)) {
-
-
     setwd("F:/ucr_data_storage/clean_data/nibrs")
     property_files <- list.files(pattern = "nibrs_property.*rds$", full.names = TRUE)
     property_files
@@ -25,14 +21,14 @@ get_property_years <- function(years) {
 
     data <- readRDS(file) %>%
       select(ori,
-             unique_incident_id,
-             date = incident_date,
-             type_of_property_loss,
-             value = value_of_property,
-             property_description,
-             suspected_drug_type_1,
-             suspected_drug_type_2,
-             suspected_drug_type_3
+        unique_incident_id,
+        date = incident_date,
+        type_of_property_loss,
+        value = value_of_property,
+        property_description,
+        suspected_drug_type_1,
+        suspected_drug_type_2,
+        suspected_drug_type_3
       ) %>%
       filter(!type_of_property_loss %in% c("unknown", "none")) %>%
       mutate(
@@ -72,7 +68,9 @@ get_property_years <- function(years) {
 
 
     rm(data_agg_yearly, data_agg_monthly)
-    gc(); Sys.sleep(1); gc()
+    gc()
+    Sys.sleep(1)
+    gc()
 
     message(years[i])
   }
@@ -133,35 +131,38 @@ get_property_agg <- function(data, time_unit) {
   data_drugs1 <-
     data %>%
     select(ori,
-           unique_incident_id,
-           time_unit,
-           drug = suspected_drug_type_1
+      unique_incident_id,
+      time_unit,
+      drug = suspected_drug_type_1
     )
   data_drugs2 <-
     data %>%
     select(ori,
-           unique_incident_id,
-           time_unit,
-           drug = suspected_drug_type_2
+      unique_incident_id,
+      time_unit,
+      drug = suspected_drug_type_2
     )
   data_drugs3 <-
     data %>%
     select(ori,
-           unique_incident_id,
-           time_unit,
-           drug = suspected_drug_type_3
+      unique_incident_id,
+      time_unit,
+      drug = suspected_drug_type_3
     )
 
   data_drugs <-
     data_drugs1 %>%
     bind_rows(data_drugs2) %>%
-    bind_rows(data_drugs3) %>%
-    filter(!drug %in% "over 3 drug types",
-           !drug %in% "other drugs: antidepressants (elavil, triavil, tofranil, etc.), aromatic hydrocarbons, propoxyphene or darvon, tranquilizers (chlordiazepoxide or librium, diazepam or valium, etc.), etc.") %>%
+    bind_rows(data_drugs3)
+  data_drugs$drug[data_drugs$drug %in% "over 3 drug types"] <- "unknown type drug"
+
+  data_drugs <-
+    data_drugs %>%
     distinct(ori,
-             unique_incident_id,
-             drug,
-             .keep_all = TRUE)
+      unique_incident_id,
+      drug,
+      .keep_all = TRUE
+    )
   data_drugs$unique_incident_id <- NULL
   data_drugs$drug <- gsub(":.*| \\(.*", "", data_drugs$drug)
 
@@ -190,43 +191,59 @@ get_property_agg <- function(data, time_unit) {
   }
 
 
+  gc()
   main_agg <-
     main_agg %>%
     rename_all(make_clean_names)
 
   main_agg <- dummy_rows(main_agg,
-                         select_columns = c("ori", "time_unit"),
-                         dummy_value = NA
+    select_columns = c("ori", "time_unit"),
+    dummy_value = NA
   )
   main_agg[is.na(main_agg)] <- 0
   return(main_agg)
 }
 
 
+source("~/crimedatatool_helper_nibrs/R/utils.R")
+#get_property_years(1991:2023)
 
-#get_property_years(2020:2023)
+make_nibrs_property_data <- function(time = "year") {
+  yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "year", full.names = TRUE)
+  monthly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "month", full.names = TRUE)
+  yearly_files
+  monthly_files
+  if (time %in% "year") {
+    yearly_data <- vector("list", length = length(yearly_files))
+    for (i in 1:length(yearly_files)) {
+      yearly_data[[i]] <- readRDS(yearly_files[i])
+      message(i)
+    }
 
+    yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)
+    gc()
+    names(yearly_data) <- gsub("property_", "", names(yearly_data))
+    save_as_csv_for_site(yearly_data, type = "year", property = TRUE)
+    rm(yearly_data)
+    gc()
+    Sys.sleep(1)
+    gc()
+  } else {
+    monthly_data <- vector("list", length = length(monthly_files))
+    for (i in 1:length(yearly_files)) {
+      monthly_data[[i]] <- readRDS(monthly_files[i])
+      message(i)
+    }
 
-yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "year", full.names = TRUE)
-monthly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "month", full.names = TRUE)
-yearly_files
-monthly_files
-
-yearly_data <- vector("list", length = length(yearly_files))
-monthly_data <- vector("list", length = length(monthly_files))
-for (i in 1:length(yearly_files)) {
-  yearly_data[[i]] <- readRDS(yearly_files[i])
-  monthly_data[[i]] <- readRDS(monthly_files[i])
-  message(i)
+    monthly_data <- data.table::rbindlist(monthly_data, fill = TRUE)
+    gc()
+    names(monthly_data) <- gsub("property_", "", names(monthly_data))
+    save_as_csv_for_site(monthly_data, type = "month", property = TRUE)
+    rm(monthly_data)
+    gc()
+    Sys.sleep(1)
+    gc()
+  }
 }
-yearly_data <- data.table::rbindlist(yearly_data, fill = TRUE)
-monthly_data <- data.table::rbindlist(monthly_data, fill = TRUE)
-gc()
-
-names(yearly_data) <- gsub("property_", "", names(yearly_data))
-names(monthly_data) <- gsub("property_", "", names(monthly_data))
-
-save_as_csv_for_site(yearly_data, type = "year", property = TRUE)
-rm(yearly_data); gc(); Sys.sleep(1); gc()
-save_as_csv_for_site(monthly_data, type = "month", property = TRUE)
-rm(monthly_data); gc(); Sys.sleep(1); gc()
+make_nibrs_property_data("year")
+make_nibrs_property_data("month")

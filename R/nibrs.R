@@ -1,8 +1,3 @@
-source("~/crimedatatool_helper_nibrs/R/utils.R")
-
-
-
-
 get_agg_data <- function(years) {
   batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
     select(
@@ -243,9 +238,48 @@ add_missing_columns <- function(data) {
 
   # Identify offenses with various subtypes/outcomes
   offense_data <- readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2023.rds") %>%
-    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2022.rds")) %>%
-    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2021.rds"))
-  victim_data <- readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2023.rds")
+    select(ucr_offense_code,
+           type_criminal_activity_1,
+           type_weapon_force_involved_1) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2022.rds") %>%
+      select(ucr_offense_code,
+             type_criminal_activity_1,
+             type_weapon_force_involved_1)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2021.rds") %>%
+      select(ucr_offense_code,
+             type_criminal_activity_1,
+             type_weapon_force_involved_1)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2010.rds") %>%
+      select(ucr_offense_code,
+             type_criminal_activity_1,
+             type_weapon_force_involved_1)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2000.rds") %>%
+      select(ucr_offense_code,
+             type_criminal_activity_1,
+             type_weapon_force_involved_1)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_1991.rds") %>%
+      select(ucr_offense_code,
+             type_criminal_activity_1,
+             type_weapon_force_involved_1))
+  victim_data <- readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2023.rds") %>%
+    select(ucr_offense_code_1,
+           race_of_victim) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2022.rds") %>%
+                select(ucr_offense_code_1,
+                       race_of_victim)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2021.rds") %>%
+                select(ucr_offense_code_1,
+                       race_of_victim)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2010.rds") %>%
+                select(ucr_offense_code_1,
+                       race_of_victim)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2000.rds") %>%
+                select(ucr_offense_code_1,
+                       race_of_victim)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_1991.rds") %>%
+                select(ucr_offense_code_1,
+                       race_of_victim))
+
 
 
   injury_offenses <- c(
@@ -341,13 +375,13 @@ add_missing_columns <- function(data) {
   return(data)
 }
 
-get_agg_data(1991:2023)
+source("~/crimedatatool_helper_nibrs/R/utils.R")
+# get_agg_data(1991:2023)
 
 make_nibrs_data <- function(time = "year") {
   gc()
   yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data/", pattern = "year", full.names = TRUE)
   if (time == "year") {
-
     yearly_data <- vector("list", length = length(yearly_files))
     for (i in 1:length(yearly_files)) {
       yearly_data[[i]] <- readRDS(yearly_files[i])

@@ -344,7 +344,8 @@ prep_admin <- function(file) {
     ) %>%
     mutate_if(is.character, tolower) %>%
     distinct(unique_incident_id,
-             .keep_all = TRUE)
+      .keep_all = TRUE
+    )
 
   data$cleared <- "not cleared"
   data$cleared[data$cleared_exceptionally %in% "victim refused to cooperate (in the prosecution)"] <- "victim refused to cooperate"
@@ -905,18 +906,20 @@ make_agency_csvs <- function(data,
     make_csv_test,
     type = type
   )
-
 }
 
 save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
   crosswalk <- read_csv("~/crimedatatool_helper_nibrs/data/crosswalk.csv") %>%
-    select(-ori,
-           -population,
-           -fips_state_county_code,
-           -census_name) %>%
+    select(
+      -ori,
+      -population,
+      -fips_state_county_code,
+      -census_name
+    ) %>%
     select(
       ORI = ori9,
-      agency_name = crosswalk_agency_name)
+      agency_name = crosswalk_agency_name
+    )
   batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
     select(
       ORI = ori,
@@ -933,9 +936,11 @@ save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
   batch_header$city_name <- NULL
 
   batch_header <- keep_most_common_agency_name(batch_header %>%
-                                                 rename(ori = ORI)) %>%
-    rename(ORI = ori,
-           agency = agency_name)
+    rename(ori = ORI)) %>%
+    rename(
+      ORI = ori,
+      agency = agency_name
+    )
 
 
 
@@ -974,10 +979,12 @@ save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
     data %>%
     rename(ORI = ori) %>%
     left_join(batch_header) %>%
-    filter(!state %in% c("canal Zone",
-                         "Guam",
-                         "Puerto Rico",
-                         "virgin Islands")) %>%
+    filter(!state %in% c(
+      "canal Zone",
+      "Guam",
+      "Puerto Rico",
+      "virgin Islands"
+    )) %>%
     remove_duplicate_capitalize_names()
 
   if (type %in% "month") {
