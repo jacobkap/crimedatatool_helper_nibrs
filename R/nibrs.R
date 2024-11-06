@@ -312,7 +312,6 @@ add_missing_columns <- function(data) {
 
   gun_offenses <- make_clean_names(sort(unique(offense_data$ucr_offense_code[offense_data$type_weapon_force_involved_1 %in% guns])))
   victim_offenses <- make_clean_names(sort(unique(c(victim_data$ucr_offense_code_1[!is.na(victim_data$race_of_victim)],
-                                                    "sex offenses - failure to register as a sex offender",
                                                     "fraud offenses - money laundering"))))
 
   offense_values <- make_clean_names(sort(unique(offense_data$ucr_offense_code)))
