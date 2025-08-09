@@ -1,5 +1,5 @@
 get_agg_data <- function(years) {
-  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
+  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2024.rds") %>%
     select(
       number_of_months_reported,
       ORI = ori,
@@ -260,7 +260,11 @@ add_missing_columns <- function(data) {
     bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_1991.rds") %>%
       select(ucr_offense_code,
              type_criminal_activity_1,
-             type_weapon_force_involved_1))
+             type_weapon_force_involved_1)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_offense_segment_2024.rds") %>%
+                select(ucr_offense_code,
+                       type_criminal_activity_1,
+                       type_weapon_force_involved_1))
   victim_data <- readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2023.rds") %>%
     select(ucr_offense_code_1,
            race_of_victim) %>%
@@ -278,6 +282,9 @@ add_missing_columns <- function(data) {
                        race_of_victim)) %>%
     bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_1991.rds") %>%
                 select(ucr_offense_code_1,
+                       race_of_victim)) %>%
+    bind_rows(readRDS("F:/ucr_data_storage/clean_data/nibrs/nibrs_victim_segment_2024.rds") %>%
+                select(ucr_offense_code_1,
                        race_of_victim))
 
 
@@ -290,7 +297,7 @@ add_missing_columns <- function(data) {
     "human_trafficking_involuntary_servitude",
     "kidnapping_abduction",
     "robbery",
-    "sex_offenses_fondling_indecent_liberties_child_molest",
+    "sex_offenses_criminal_sexual_contact_formerly_sex_offenses_fondling_indecent_liberties_child_molest",
     "sex_offenses_rape",
     "sex_offenses_sexual_assault_with_an_object",
     "sex_offenses_sodomy"
@@ -376,8 +383,8 @@ add_missing_columns <- function(data) {
   return(data)
 }
 
-source("~/crimedatatool_helper_nibrs/R/utils.R")
-# get_agg_data(1991:2023)
+source("R/utils.R")
+# get_agg_data(1991:2024)
 
 make_nibrs_data <- function(time = "year") {
   gc()

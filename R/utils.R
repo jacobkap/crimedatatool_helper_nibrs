@@ -154,14 +154,15 @@ relationship_unknown <- "relationship unknown"
 relationship_stranger <- "victim was stranger"
 relationship_other <- c(
   "victim was acquaintance",
-  "victim was babysittee (the baby)",
+  "victim was babysittee (child in the care of a babysitter)",
   "victim was cohabitant",
   "victim was employee",
   "victim was employer",
   "victim was friend",
   "victim was neighbor",
   "victim was offender",
-  "victim was otherwise known"
+  "victim was otherwise known",
+  "victim was cohabitant (non-intimate relationship)"
 )
 
 relationship_intimate_partner <- c(
@@ -453,7 +454,6 @@ prep_offense <- function(file, batch_header) {
       -location_type
     )
 
-  data <- group_theft_offenses(data)
   data$offense <- paste("offense", data$offense)
   data$subtype <- paste("offense", data$subtype)
   data$gun_involved <- paste("offense", data$gun_involved)
@@ -515,7 +515,8 @@ prep_victim <- function(file, batch_header) {
     "other major injury",
     "unconsciousness",
     "loss of teeth",
-    "possible internal injury"
+    "possible internal injury",
+    "gunshot wound"
   )
   data$victim_injury <- "unknown injury"
   data$victim_injury[data$type_of_injury_1 %in% "none" |
@@ -591,7 +592,6 @@ prep_victim <- function(file, batch_header) {
     c(NA, "unknown")] <- "unknown_ethnicity"
 
 
-  data <- group_theft_offenses(data)
   data$sex_of_victim <- paste0("victim_", data$sex_of_victim)
   data$race_of_victim <- paste0("victim_", data$race_of_victim)
   data$ethnicity_of_victim <- paste0("victim_", data$ethnicity_of_victim)
@@ -644,7 +644,6 @@ prep_offender <- function(file, offense_data, batch_header) {
   data$age_category[data$age_of_offender %in% 0:17] <- "offender_juvenile"
   data$age_category[data$age_of_offender %in% 18:99] <- "offender_adult"
 
-  data <- group_theft_offenses(data)
   data$offense <- paste("offender", data$offense)
   return(data)
 }
@@ -701,7 +700,6 @@ prep_arrestee <- function(arrestee_file, arrestee_group_b_file, batch_header) {
   data$race_of_arrestee[data$race_of_arrestee %in% c(NA, "unknown")] <- "unknown_race"
   data$ethnicity_of_arrestee[data$ethnicity_of_arrestee %in% c(NA, "unknown")] <- "unknown_ethnicity"
 
-  data <- group_theft_offenses(data)
   data$sex_of_arrestee <- paste0("arrestee_", data$sex_of_arrestee)
   data$race_of_arrestee <- paste0("arrestee_", data$race_of_arrestee)
   data$ethnicity_of_arrestee <- paste0("arrestee_", data$ethnicity_of_arrestee)
@@ -723,7 +721,7 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
     "murder/nonnegligent manslaughter",
     "negligent manslaughter",
     "robbery",
-    "sex offenses - fondling (indecent liberties/child molest)",
+    "sex offenses - criminal sexual contact (formerly: sex offenses - fondling (indecent liberties/child molest))",
     "sex offenses - rape",
     "sex offenses - sexual assault with an object",
     "sex offenses - sodomy",
@@ -740,15 +738,16 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
     "human trafficking - involuntary servitude",
     "kidnapping/abduction",
     "motor vehicle theft",
-    "murder/nonnegligent manslaughter",
-    "negligent manslaughter",
     "robbery",
-    "sex offenses - fondling (indecent liberties/child molest)",
+    "sex offenses - criminal sexual contact (formerly: sex offenses - fondling (indecent liberties/child molest))",
     "sex offenses - incest",
     "sex offenses - rape",
     "sex offenses - sexual assault with an object",
     "sex offenses - sodomy",
-    "sex offenses - statutory rape"
+    "sex offenses - statutory rape",
+    "murder/nonnegligent manslaughter",
+    "negligent manslaughter",
+    "justifiable homicide - not a crime"
   )
   person_victim_types <- c(
     "individual",
@@ -771,7 +770,7 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
     "negligent manslaughter",
     "pornography/obscene material",
     "robbery",
-    "sex offenses - fondling (indecent liberties/child molest)",
+    "sex offenses - criminal sexual contact (formerly: sex offenses - fondling (indecent liberties/child molest))",
     "sex offenses - rape",
     "sex offenses - sexual assault with an object",
     "sex offenses - sodomy",
@@ -1100,8 +1099,3 @@ dummy_rows_missing_years <- function(data, type) {
 }
 
 
-
-group_theft_offenses <- function(data) {
-  data$offense[data$offense %in% theft_crimes] <- "theft"
-  return(data)
-}

@@ -1,11 +1,11 @@
 get_property_years <- function(years) {
-  inflation_adjust <- data.frame(year = 1991:2023, price = 1)
+  inflation_adjust <- data.frame(year = 1991:2024, price = 1)
   inflation_adjust$in_current_dollars <- adjust_for_inflation(inflation_adjust$price,
     inflation_adjust$year,
     "US",
-    to_date = 2023
+    to_date = 2024
   )
-  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
+  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2024.rds") %>%
     select(
       ori,
       number_of_months_reported,
@@ -206,7 +206,7 @@ get_property_agg <- function(data, time_unit) {
 
 
 source("~/crimedatatool_helper_nibrs/R/utils.R")
-#get_property_years(1991:2023)
+#get_property_years(1991:2024)
 
 make_nibrs_property_data <- function(time = "year") {
   yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "year", full.names = TRUE)
