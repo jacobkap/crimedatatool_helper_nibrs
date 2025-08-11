@@ -5,7 +5,7 @@ get_property_years <- function(years) {
     "US",
     to_date = 2024
   )
-  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2024.rds") %>%
+  batch_header <- readRDS("E:/ucr_data_storage/clean_data/nibrs/batch_header/nibrs_batch_header_1991_2024.rds") %>%
     select(
       ori,
       number_of_months_reported,
@@ -13,8 +13,9 @@ get_property_years <- function(years) {
     )
 
   for (i in 1:length(years)) {
-    setwd("F:/ucr_data_storage/clean_data/nibrs")
-    property_files <- list.files(pattern = "nibrs_property.*rds$", full.names = TRUE)
+    property_files <- list.files(path = "E:/ucr_data_storage/clean_data/nibrs/property_segment/",
+                                 pattern = "nibrs_property.*rds$",
+                                 full.names = TRUE)
     property_files
     year_temp <- years[i]
     file <- property_files[grep(year_temp, property_files)]
@@ -43,7 +44,7 @@ get_property_years <- function(years) {
     data$value[data$value %in% "unknown"] <- NA
     data$value <- parse_number(data$value)
 
-    # Adjusted to 2022 cumulative inflation
+    # Adjusted to 2024 cumulative inflation
     data$value <- data$value * data$in_current_dollars
     data$in_current_dollars <- NULL
 
@@ -59,11 +60,11 @@ get_property_years <- function(years) {
     data_agg_yearly$unique_incident_id <- NULL
     saveRDS(
       data_agg_yearly,
-      paste0("~/crimedatatool_helper_nibrs/data/agg_data_property/temp_agg_year_nibrs_property_", year_temp, ".rds")
+      paste0("data/agg_data_property/temp_agg_year_nibrs_property_", year_temp, ".rds")
     )
     saveRDS(
       data_agg_monthly,
-      paste0("~/crimedatatool_helper_nibrs/data/agg_data_property/temp_agg_month_nibrs_property_", year_temp, ".rds")
+      paste0("data/agg_data_property/temp_agg_month_nibrs_property_", year_temp, ".rds")
     )
 
 
@@ -205,12 +206,10 @@ get_property_agg <- function(data, time_unit) {
 }
 
 
-source("~/crimedatatool_helper_nibrs/R/utils.R")
-#get_property_years(1991:2024)
 
 make_nibrs_property_data <- function(time = "year") {
-  yearly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "year", full.names = TRUE)
-  monthly_files <- list.files("~/crimedatatool_helper_nibrs/data/agg_data_property/", pattern = "month", full.names = TRUE)
+  yearly_files <- list.files("data/agg_data_property/", pattern = "year", full.names = TRUE)
+  monthly_files <- list.files("data/agg_data_property/", pattern = "month", full.names = TRUE)
   yearly_files
   monthly_files
   if (time %in% "year") {
@@ -245,5 +244,9 @@ make_nibrs_property_data <- function(time = "year") {
     gc()
   }
 }
+
+
+source("R/utils.R")
+#get_property_years(1991:2024)
 make_nibrs_property_data("year")
 make_nibrs_property_data("month")

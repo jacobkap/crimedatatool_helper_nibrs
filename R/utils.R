@@ -17,7 +17,6 @@ packages <- c(
 library(groundhog)
 groundhog.library(packages, "2024-10-01")
 
-setwd("F:/ucr_data_storage/clean_data/nibrs")
 
 
 remove_duplicate_capitalize_names <- function(data) {
@@ -49,12 +48,12 @@ remove_duplicate_capitalize_names <- function(data) {
       agency = gsub("twp", "township", agency),
       agency = gsub("div ", "division ", agency),
       agency = gsub("ptrl:", "patrol:", agency),
-      agency = gsub("bf:", "bureau of forestry:", agency),
+      agency = gsub("bD:", "bureau of forestry:", agency),
       agency = gsub("hp:", "highway patrol:", agency),
       agency = gsub("chp ", "california highway patrol:", agency),
       agency = gsub("bn:", "office of attorney general region:", agency),
       agency = gsub("dle:", "division of law enforcement:", agency),
-      agency = gsub("enf:|enf ", "enforcement", agency),
+      agency = gsub("enD:|enf ", "enforcement", agency),
       agency = gsub("law enf div dept natrl resources", "department of natural resources", agency),
       agency = gsub("fl ", "florida", agency),
       agency = gsub("dnr:", "department of natural resources:", agency),
@@ -155,7 +154,6 @@ relationship_stranger <- "victim was stranger"
 relationship_other <- c(
   "victim was acquaintance",
   "victim was babysittee (child in the care of a babysitter)",
-  "victim was cohabitant",
   "victim was employee",
   "victim was employer",
   "victim was friend",
@@ -263,8 +261,9 @@ subtype_sell_create_assist <- c(
 
 
 combine_agg_data <- function(type, batch_data, states_to_keep = NULL) {
-  setwd("~/crimedatatool_helper_nibrs/data/")
-  files <- list.files(pattern = paste0("temp_agg_", type))
+  files <- list.files(path = "data/",
+                      pattern = paste0("temp_agg_", type),
+                      full.names = TRUE)
   if (type %in% c("year", "month")) {
     files <- files[-grep("property", files)]
   }
@@ -874,41 +873,43 @@ aggregate_data <- function(data, variables = NULL, time_unit, victim_type = FALS
 
 
 
-make_largest_agency_json <- function(data) {
+make_largest_agency_json <- function(data, folder) {
   largest_agency <- data %>%
     filter(year %in% max(data$year)) %>%
     dplyr::group_by(state) %>%
     dplyr::top_n(1, population) %>%
     dplyr::select(state, agency)
   largest_agency <- jsonlite::toJSON(largest_agency, pretty = TRUE)
-  write(largest_agency, "largest_agency_choices.json")
+  write(largest_agency, paste0(folder, "largest_agency_choices.json"))
 }
 
-make_state_agency_choices <- function(data) {
+make_state_agency_choices <- function(data, folder) {
   data <- data.table::as.data.table(data)
   for (selected_state in unique(data$state)) {
     temp <- data[state %in% selected_state]
     agency <- unique(temp$agency)
 
     agency <- jsonlite::toJSON(agency, pretty = FALSE)
-    write(agency, paste0(selected_state, "_agency_choices.json"))
+    write(agency, paste0(folder, selected_state, "_agency_choices.json"))
   }
 }
 
 
 make_agency_csvs <- function(data,
-                             type = "year") {
+                             type = "year",
+                             folder) {
   data <-
     data %>%
     dplyr::group_split(ORI)
   parallel::mclapply(data,
     make_csv_test,
-    type = type
+    type = type,
+    folder = folder
   )
 }
 
 save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
-  crosswalk <- read_csv("~/crimedatatool_helper_nibrs/data/crosswalk.csv") %>%
+  crosswalk <- read_csv("data/crosswalk.csv") %>%
     select(
       -ori,
       -population,
@@ -919,7 +920,7 @@ save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
       ORI = ori9,
       agency_name = crosswalk_agency_name
     )
-  batch_header <- readRDS("F:/ucr_data_storage/clean_data/combined_years/nibrs/nibrs_batch_header_1991_2023.rds") %>%
+  batch_header <- readRDS("E:/ucr_data_storage/clean_data/nibrs/batch_header/nibrs_batch_header_1991_2024.rds") %>%
     select(
       ORI = ori,
       city_name,
@@ -1008,33 +1009,31 @@ save_as_csv_for_site <- function(data, type = "year", property = FALSE) {
 
   if (property) {
     if (type %in% "year") {
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
-      make_largest_agency_json(data)
-      make_state_agency_choices(data)
-      make_agency_csvs(data)
+      make_largest_agency_json(data, folder = "data/nibrs_property/")
+      make_state_agency_choices(data, folder = "data/nibrs_property/")
+      make_agency_csvs(data, folder = "data/nibrs_property/")
     } else {
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property")
-      files <- list.files(pattern = "agency_choices")
+      files <- list.files(path = "data/nibrs_property/",
+                          pattern = "agency_choices",
+                          full.names = TRUE)
       files
-      file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_property_monthly/", overwrite = TRUE)
+      file.copy(files, "data/nibrs_property_monthly/", overwrite = TRUE)
 
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs_property_monthly")
-      make_agency_csvs(data, type = "month")
+      make_agency_csvs(data, type = "month", folder = "data/nibrs_property_monthly/")
     }
   } else {
     if (type %in% "year") {
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs")
-      make_largest_agency_json(data)
-      make_state_agency_choices(data)
-      make_agency_csvs(data)
+      make_largest_agency_json(data, folder = "data/nibrs/")
+      make_state_agency_choices(data, folder = "data/nibrs/")
+      make_agency_csvs(data, folder = "data/nibrs/")
     } else {
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs")
-      files <- list.files(pattern = "agency_choices")
+      files <- list.files(path = "data/nibrs/",
+                          pattern = "agency_choices",
+                          full.names = TRUE)
       files
-      file.copy(files, "~/crimedatatool_helper_nibrs/data/nibrs_monthly/", overwrite = TRUE)
+      file.copy(files, "data/nibrs_monthly/", overwrite = TRUE)
 
-      setwd("~/crimedatatool_helper_nibrs/data/nibrs_monthly")
-      make_agency_csvs(data, type = "month")
+      make_agency_csvs(data, type = "month", folder = "data/nibrs_monthly/")
     }
   }
 }
@@ -1045,7 +1044,7 @@ make_all_na <- function(col) {
   col <- NA
 }
 
-make_csv_test <- function(temp, type) {
+make_csv_test <- function(temp, type, folder) {
   temp <- dummy_rows_missing_years(temp, type = type)
 
   state <- unique(temp$state)
@@ -1056,7 +1055,7 @@ make_csv_test <- function(temp, type) {
   agency <- gsub("_+", "_", agency)
   agency <- gsub("\\(|\\)", "", agency)
 
-  data.table::fwrite(temp, file = paste0(state, "_", agency, ".csv"))
+  data.table::fwrite(temp, file = paste0(folder, state, "_", agency, ".csv"))
 }
 
 dummy_rows_missing_years <- function(data, type) {
